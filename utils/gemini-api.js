@@ -1,15 +1,25 @@
-import { GEMINI_API_KEY, API_CONFIG } from '../config.js';
+import { GEMINI_API_KEY as DEFAULT_KEY, API_CONFIG } from '../config.js';
 
 export async function generateGeminiReply(systemPrompt, userMessage, context) {
-    if (!GEMINI_API_KEY || GEMINI_API_KEY.length < 10 || GEMINI_API_KEY === "YOUR_GEMINI_API_KEY_HERE") {
-        return { error: "⚠️ Please configure a valid Gemini API Key in `config.js`." };
+    // Retrieve custom key from storage
+    const getCustomKey = () => new Promise(resolve => {
+        chrome.storage.sync.get('settings', (items) => {
+            resolve(items.settings?.apiKey || null);
+        });
+    });
+
+    const customKey = await getCustomKey();
+    const apiKey = (customKey && customKey.length > 10) ? customKey : DEFAULT_KEY;
+
+    if (!apiKey || apiKey.length < 10 || apiKey === "YOUR_GEMINI_API_KEY_HERE") {
+        return { error: "⚠️ Please configure a valid Gemini API Key in Extension Options." };
     }
 
     let model = API_CONFIG?.model || "gemini-2.5-flash-lite";
     if (["gemini-pro", "gemini-1.5-flash", "gemini-1.5-flash-latest", "gemini-1.5-flash-001"].includes(model)) {
         model = "gemini-2.5-flash-lite";
     }
-    const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`;
+    const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
     const payload = {
         contents: [{

@@ -44,14 +44,14 @@ let detectedPageType = "generic";
     // 4. Listen for background messages
     chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         if (msg.action === "TOGGLE_SIDEBAR") { // From context menu or shortcut
-            toggleSidebar(!sidebarOpen);
+            toggleSidebar(!sidebarOpen, false); // No force refresh
         }
         if (msg.action === "CLOSE_SIDEBAR") {
             toggleSidebar(false);
         }
         if (msg.action === "ANALYZE_REQUEST") {
             // Example: User clicked "Analyze with AI" in context menu
-            toggleSidebar(true);
+            toggleSidebar(true, true); // FORCE REFRESH to capture new selection
             // Forward to sidebar
             setTimeout(() => sendToSidebar({ action: "UPDATE_SIDEBAR_CONTENT", data: "Analyzing selection..." }), 500);
         }
@@ -62,12 +62,20 @@ let detectedPageType = "generic";
         setupCodeInteractions();
     }
 
-    // 6. Auto-close when switching tabs
-    document.addEventListener("visibilitychange", () => {
-        if (document.hidden && sidebarOpen) {
-            toggleSidebar(false);
+    // 6. Auto-close removed to allow per-tab persistence
+    // document.addEventListener("visibilitychange", () => ... );
+    // 7. Click outside to minimize (User Request)
+    document.addEventListener('click', (event) => {
+        if (sidebarOpen && shadowHost) {
+            // Check if the click target is NOT the shadow host (which contains the toggle btn/iframe)
+            // If the user clicks the main page content, the target will be some body element.
+            if (event.target !== shadowHost) {
+                console.log("Sidebar: Click outside detected, closing.");
+                toggleSidebar(false);
+            }
         }
     });
+
 })();
 
 function injectSidebar() {
@@ -142,7 +150,7 @@ function injectSidebar() {
     toggleBtn.className = "toggle-btn";
     toggleBtn.textContent = "🤖";
     toggleBtn.title = "Open AI Assistant";
-    toggleBtn.addEventListener('click', () => toggleSidebar(!sidebarOpen));
+    toggleBtn.addEventListener('click', () => toggleSidebar(!sidebarOpen, false));
     shadowRoot.appendChild(toggleBtn);
 }
 
@@ -186,10 +194,23 @@ function extractReadme() {
 }
 
 
-async function toggleSidebar(open) {
+// State Tracking for Caching
+let isSidebarInitialized = false;
+let lastUrl = "";
+
+async function toggleSidebar(open, forceRefresh = false) {
     sidebarOpen = open;
     if (open) {
         sidebarIframe.classList.add('open');
+
+        // CACHING CHECK:
+        // If not forced, already init, and same URL -> Do nothing (retain state)
+        if (!forceRefresh && isSidebarInitialized && window.location.href === lastUrl) {
+            console.log("Sidebar: Restoring cached state.");
+            return;
+        }
+
+        console.log("Sidebar: Initializing/Refreshing content...");
 
         // Extract Data based on Page Type
         let payload = {};
@@ -212,6 +233,10 @@ async function toggleSidebar(open) {
             productData: payload.productData,
             ...payload
         });
+
+        // Update Cache State
+        isSidebarInitialized = true;
+        lastUrl = window.location.href;
 
     } else {
         sidebarIframe.classList.remove('open');

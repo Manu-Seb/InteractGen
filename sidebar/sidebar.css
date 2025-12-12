@@ -1,7 +1,8 @@
 :root {
   --bg-color: #ffffff;
   --text-color: #333333;
-  --accent-color: #6366f1; /* Indigo */
+  --accent-color: #6366f1;
+  /* Indigo */
   --accent-hover: #4f46e5;
   --border-color: #e5e7eb;
   --secondary-bg: #f9fafb;
@@ -108,8 +109,13 @@ body {
 }
 
 @keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+  0% {
+    transform: rotate(0deg);
+  }
+
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
 /* Cards & Actions */
@@ -134,7 +140,8 @@ body {
 
 .card:hover {
   border-color: var(--accent-color);
-  background: #f0fdf4; /* faint green/indigo tint equivalent */
+  background: #f0fdf4;
+  /* faint green/indigo tint equivalent */
 }
 
 .card-icon {
@@ -152,7 +159,10 @@ body {
 }
 
 /* Buttons */
-.small-btn, .pill-btn, .primary-btn, .secondary-btn {
+.small-btn,
+.pill-btn,
+.primary-btn,
+.secondary-btn {
   border: none;
   border-radius: 6px;
   cursor: pointer;
@@ -221,6 +231,7 @@ body {
 .tab-content {
   display: none;
 }
+
 .tab-content.active {
   display: block;
 }
@@ -303,4 +314,24 @@ input[type="text"]:focus {
   font-size: 12px;
   overflow-x: auto;
   margin-top: 10px;
+}
+
+/* Chat Container in Tabs */
+.chat-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.chat-footer {
+  display: flex;
+  gap: 8px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border-color);
+  margin-top: auto;
+  /* Push to bottom */
+}
+
+.chat-footer input {
+  flex: 1;
 }

@@ -29,69 +29,167 @@
       </div>
     </main>
 
-    <!-- Footer / Chat Input (visible in some modes) -->
-    <footer id="footer-input" class="hidden">
-      <input type="text" id="user-input" placeholder="Ask something..." />
-      <button id="send-btn">➤</button>
-    </footer>
+    <!-- Footer removed (moved into templates) -->
+    <!-- <footer id="footer-input" class="hidden">...</footer> -->
   </div>
 
-  <!-- Templates for different states to clone from -->
+  <!-- Templates -->
+
   <template id="template-blog">
-    <div class="section">
-      <h3>📄 Article Assistant</h3>
-      <div class="card action-card" data-action="summarize">
-        <div class="card-icon">📝</div>
-        <div class="card-text">Summarize this article</div>
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="assistant">Assistant</button>
+      <button class="tab-btn" data-tab="chat">Chat</button>
+      <button class="tab-btn" data-tab="saved-pages">Saved</button>
+    </div>
+
+    <div id="tab-assistant" class="tab-content active">
+      <div class="section">
+        <h3>📄 Article Assistant</h3>
+        <div class="card action-card" data-action="summarize">
+          <div class="card-icon">📝</div>
+          <div class="card-text">Summarize this article</div>
+        </div>
+        <div class="options-row">
+          <button class="small-btn" data-action="keypoints">Key Points</button>
+          <button class="small-btn" data-action="tldr">TL;DR</button>
+        </div>
+        <div id="result-area" class="result-box hidden"></div>
       </div>
-      <div class="options-row">
-        <button class="small-btn" data-action="keypoints">Key Points</button>
-        <button class="small-btn" data-action="tldr">TL;DR</button>
+    </div>
+
+    <div id="tab-chat" class="tab-content">
+      <div class="chat-container">
+        <div id="chat-history" class="chat-history"></div>
+        <div class="chat-footer">
+          <input type="text" id="user-input" placeholder="Ask about this article..." />
+          <button id="send-btn">➤</button>
+        </div>
       </div>
-      <div id="result-area" class="result-box hidden"></div>
+    </div>
+
+    <div id="tab-saved-pages" class="tab-content">
+      <div class="quick-actions">
+        <button class="primary-btn full-width" id="save-page-btn">⭐ Save Current Page</button>
+      </div>
+      <ul id="saved-pages-list" class="list-group"></ul>
     </div>
   </template>
 
   <template id="template-marketplace">
-    <div class="section">
-      <h3>🛍️ Shopping Assistant</h3>
-      <div class="card action-card" data-action="compare">
-        <div class="card-icon">⚖️</div>
-        <div class="card-text">Compare prices</div>
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="assistant">Assistant</button>
+      <button class="tab-btn" data-tab="chat">Chat</button>
+      <button class="tab-btn" data-tab="saved-pages">Saved</button>
+    </div>
+
+    <div id="tab-assistant" class="tab-content active">
+      <div class="section">
+        <h3>🛍️ Shopping Assistant</h3>
+        <div class="card action-card" data-action="compare">
+          <div class="card-icon">⚖️</div>
+          <div class="card-text">Compare prices</div>
+        </div>
+        <div class="card action-card" data-action="similar">
+          <div class="card-icon">🔍</div>
+          <div class="card-text">Find similar items</div>
+        </div>
+        <div class="result-box hidden" id="shopping-results"></div>
       </div>
-      <div class="card action-card" data-action="similar">
-        <div class="card-icon">🔍</div>
-        <div class="card-text">Find similar items</div>
+    </div>
+
+    <div id="tab-chat" class="tab-content">
+      <div class="chat-container">
+        <div id="chat-history" class="chat-history"></div>
+        <div class="chat-footer">
+          <input type="text" id="user-input" placeholder="Ask about this product..." />
+          <button id="send-btn">➤</button>
+        </div>
       </div>
-      <div class="result-box hidden" id="shopping-results"></div>
+    </div>
+
+    <div id="tab-saved-pages" class="tab-content">
+      <div class="quick-actions">
+        <button class="primary-btn full-width" id="save-page-btn">⭐ Save Current Page</button>
+      </div>
+      <ul id="saved-pages-list" class="list-group"></ul>
     </div>
   </template>
 
   <template id="template-online-course">
-    <div class="section">
-      <h3>🎓 Course Assistant</h3>
-      <div class="card action-card" data-action="similar-courses">
-        <div class="card-icon">📚</div>
-        <div class="card-text">Find similar courses</div>
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="assistant">Assistant</button>
+      <button class="tab-btn" data-tab="chat">Chat</button>
+      <button class="tab-btn" data-tab="saved-pages">Saved</button>
+    </div>
+
+    <div id="tab-assistant" class="tab-content active">
+      <div class="section">
+        <h3>🎓 Course Assistant</h3>
+        <div class="card action-card" data-action="similar-courses">
+          <div class="card-icon">📚</div>
+          <div class="card-text">Find similar courses</div>
+        </div>
+        <div class="result-box hidden" id="course-results"></div>
       </div>
-      <div class="result-box hidden" id="course-results"></div>
+    </div>
+
+    <div id="tab-chat" class="tab-content">
+      <div class="chat-container">
+        <div id="chat-history" class="chat-history"></div>
+        <div class="chat-footer">
+          <input type="text" id="user-input" placeholder="Ask about this course..." />
+          <button id="send-btn">➤</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="tab-saved-pages" class="tab-content">
+      <div class="quick-actions">
+        <button class="primary-btn full-width" id="save-page-btn">⭐ Save Current Page</button>
+      </div>
+      <ul id="saved-pages-list" class="list-group"></ul>
     </div>
   </template>
 
   <template id="template-dev">
-    <div class="section">
-      <h3>💻 Code Assistant</h3>
-      <p class="hint-text">Select a code block on the page or choose an option:</p>
-      <div class="card action-card" data-action="explain">
-        <div class="card-icon">🤔</div>
-        <div class="card-text">Explain code</div>
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="assistant">Assistant</button>
+      <button class="tab-btn" data-tab="chat">Chat</button>
+      <button class="tab-btn" data-tab="saved-pages">Saved</button>
+    </div>
+
+    <div id="tab-assistant" class="tab-content active">
+      <div class="section">
+        <h3>💻 Code Assistant</h3>
+        <p class="hint-text">Select a code block on the page or choose an option:</p>
+        <div class="card action-card" data-action="explain">
+          <div class="card-icon">🤔</div>
+          <div class="card-text">Explain code</div>
+        </div>
+        <div class="card action-card" data-action="docs">
+          <div class="card-icon">📖</div>
+          <div class="card-text">Find Docs</div>
+        </div>
+        <div id="code-preview" class="code-block hidden"></div>
+        <div id="analysis-result" class="result-box hidden"></div>
       </div>
-      <div class="card action-card" data-action="docs">
-        <div class="card-icon">📖</div>
-        <div class="card-text">Find Docs</div>
+    </div>
+
+    <div id="tab-chat" class="tab-content">
+      <div class="chat-container">
+        <div id="chat-history" class="chat-history"></div>
+        <div class="chat-footer">
+          <input type="text" id="user-input" placeholder="Ask about this code..." />
+          <button id="send-btn">➤</button>
+        </div>
       </div>
-      <div id="code-preview" class="code-block hidden"></div>
-      <div id="analysis-result" class="result-box hidden"></div>
+    </div>
+
+    <div id="tab-saved-pages" class="tab-content">
+      <div class="quick-actions">
+        <button class="primary-btn full-width" id="save-page-btn">⭐ Save Current Page</button>
+      </div>
+      <ul id="saved-pages-list" class="list-group"></ul>
     </div>
   </template>
 
@@ -103,7 +201,13 @@
     </div>
 
     <div id="tab-chat" class="tab-content active">
-      <div id="chat-history" class="chat-history"></div>
+      <div class="chat-container">
+        <div id="chat-history" class="chat-history"></div>
+        <div class="chat-footer">
+          <input type="text" id="user-input" placeholder="Ask something..." />
+          <button id="send-btn">➤</button>
+        </div>
+      </div>
     </div>
 
     <div id="tab-saved-pages" class="tab-content">

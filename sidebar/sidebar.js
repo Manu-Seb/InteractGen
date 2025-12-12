@@ -54,7 +54,7 @@ function setupGlobalListeners() {
         window.parent.postMessage({ action: "CLOSE_SIDEBAR" }, "*");
     });
 
-    // Event Delegation
+    // Event Delegation for static elements or bubble-up events
     document.getElementById('main-content').addEventListener('click', (e) => {
         // 1. Tabs
         const tabBtn = e.target.closest('.tab-btn');
@@ -89,11 +89,6 @@ function setupGlobalListeners() {
             return;
         }
     });
-
-    document.getElementById('send-btn').addEventListener('click', sendChatMessage);
-    document.getElementById('user-input').addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') sendChatMessage();
-    });
 }
 
 function updateUI() {
@@ -115,14 +110,22 @@ function updateUI() {
         main.appendChild(clone);
     }
 
-    // Toggle footer
-    const footer = document.getElementById('footer-input');
-    if (currentPageType === "generic") {
-        footer.classList.remove('hidden');
-        loadChatHistory();
-        loadSavedPages();
-    } else {
-        footer.classList.add('hidden');
+    // Initialize layout for the new content
+    setupChatListeners();
+    loadChatHistory();
+    loadSavedPages(); // Safe to call even if element not present
+}
+
+function setupChatListeners() {
+    // These IDs now exist inside the cloned template in main-content
+    const sendBtn = document.getElementById('send-btn');
+    const userInput = document.getElementById('user-input');
+
+    if (sendBtn && userInput) {
+        sendBtn.addEventListener('click', sendChatMessage);
+        userInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') sendChatMessage();
+        });
     }
 }
 
