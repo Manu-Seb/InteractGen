@@ -182,15 +182,22 @@ async function handleAIRequest(msg) {
                 responseData = explainRes.reply || explainRes.error;
                 break;
             case "REQUEST_DOCS": // Dev - Find Docs
-                console.log("Service Worker: Finding Docs...");
+                console.log("Service Worker: Finding Docs (AI Search)...");
                 const codeForDocs = msg.payload?.code || "No code provided.";
-                const docsPrompt = `Identify the library, framework, or command used in this code/command. 
-                Provide a summary of what it does and a direct link to the **Official Documentation** for it.
+
+                const docsPrompt = `You are a technical documentation expert. 
+                Analyze the following code snippet and identify EVERY specific function call, class, or method used from external libraries/frameworks.
+
+                1. **Function-Level Explanation**: For EACH function/method found (e.g., 'useEffect', 'axios.get', 'path.join'), explain exactly what it does *in the context of this code*.
+                2. **Deep Documentation Links**: Provide the direct, specific documentation link for that FUNCTION or method if available (not just the homepage).
+
+                Format the output as a clean list:
+                - **\`functionName\`** (Library): Explanation... [Link](...)
                 
                 Code Snippet:
-                ${codeForDocs.substring(0, 2000)}`;
+                ${codeForDocs.substring(0, 3000)}`;
 
-                const docsRes = await generateGeminiReply("You are a documentation expert. Provide official links.", docsPrompt, { url: msg.url, pageType: msg.pageType, useGrounding: true });
+                const docsRes = await generateGeminiReply("You are a helpful developer assistant. Use Google Search to find specific function docs.", docsPrompt, { url: msg.url, pageType: msg.pageType, useGrounding: true });
                 responseData = docsRes.reply || docsRes.error;
                 break;
             case "REQUEST_SIMILAR_COURSES": // Online Course
