@@ -99,6 +99,7 @@ function updateUI() {
     const footer = document.getElementById('footer-input');
     if (currentPageType === "generic") {
         footer.classList.remove('hidden');
+        loadChatHistory(); // Restore chat when generic template is loaded
     } else {
         footer.classList.add('hidden');
     }
@@ -169,6 +170,21 @@ function handleContentUpdate(data) {
 }
 
 // Chat
+async function loadChatHistory() {
+    console.log("Sidebar: Loading chat history...");
+    try {
+        const data = await chrome.storage.session.get("chatHistory");
+        console.log("Sidebar: Got history data:", data);
+        const history = data.chatHistory || [];
+        if (history.length > 0) {
+            console.log(`Sidebar: Restoring ${history.length} messages`);
+            history.forEach(msg => addChatMessage(msg.text, msg.role, false)); // Don't re-save
+        }
+    } catch (e) {
+        console.error("Sidebar: Session storage error:", e);
+    }
+}
+
 function sendChatMessage() {
     const input = document.getElementById('user-input');
     const msg = input.value.trim();
@@ -190,7 +206,7 @@ function sendChatMessage() {
     });
 }
 
-function addChatMessage(text, role) {
+function addChatMessage(text, role, save = true) {
     const history = document.getElementById('chat-history');
     if (!history) return;
 
@@ -199,6 +215,14 @@ function addChatMessage(text, role) {
     div.textContent = text;
     history.appendChild(div);
     history.scrollTop = history.scrollHeight;
+
+    if (save) {
+        chrome.storage.session.get("chatHistory", (data) => {
+            const list = data.chatHistory || [];
+            list.push({ text, role, timestamp: Date.now() });
+            chrome.storage.session.set({ chatHistory: list });
+        });
+    }
 }
 
 // Reminders
