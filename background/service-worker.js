@@ -4,6 +4,8 @@
 // import { detectPageType } from '../utils/page-detector.js'; 
 import { GEMINI_API_KEY } from '../config.js';
 
+import { generateGeminiReply } from '../utils/gemini-api.js';
+
 // ---- Setup & Install ----
 chrome.runtime.onInstalled.addListener(() => {
     console.log("Context-Aware AI Assistant installed.");
@@ -60,17 +62,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 // ---- Core Logic Stubs ----
 
 async function handleAIRequest(msg) {
-    // Simulate network delay
-    await new Promise(r => setTimeout(r, 1500));
+    // Simulate network delay for UI feedback
+    await new Promise(r => setTimeout(r, 1000));
 
-    if (GEMINI_API_KEY === "YOUR_GEMINI_API_KEY_HERE") {
-        console.warn("Gemini API Key is missing in config.js");
-    } else {
-        console.log("Using Gemini API Key: " + GEMINI_API_KEY.substring(0, 4) + "...");
-        // TODO: Implement actual fetch request to Gemini API here
-    }
-
-    const type = msg.pageType;
     let text = "";
 
     switch (msg.action) {
@@ -82,6 +76,9 @@ async function handleAIRequest(msg) {
             break;
         case "REQUEST_PRODUCT_COMPARISON": // Marketplace
             text = "💰 Price Comparison:\n- Amazon: $29.99\n- eBay: $24.50 (Used)\n- Official Store: $35.00\n\nRecommendation: eBay offers best value if you don't mind open-box.";
+            break;
+        case "REQUEST_SIMILAR_ITEMS": // Marketplace
+            text = "🔍 Similar Items:\n1. Logitech MX Master 3S - $99\n2. Keychron K2 Pro - $89\n3. Dell UltraSharp 27 - $450";
             break;
         case "REQUEST_CODE_EXPLAIN": // Dev
             text = "💡 Code Explanation:\nThis function uses a heuristics-based approach to classify the current DOM. It checks for specific store indicators (meta tags) and developer site hostnames to determine the `pageType` string.";
@@ -100,10 +97,16 @@ async function handleAIRequest(msg) {
 }
 
 async function handleChat(msg) {
-    await new Promise(r => setTimeout(r, 800));
-    return {
-        reply: `I see you are on ${msg.context.pageType} page. detailed answer to "${msg.message}" would go here. I can help you analyze this content further.`
-    };
+    // Minimalistic system instruction
+    const systemPrompt = "You are a helpful browser assistant. Keep your responses extremely concise, minimal, and directly to the point. Do not be verbose.";
+
+    const result = await generateGeminiReply(systemPrompt, msg.message, msg.context);
+
+    if (result.error) {
+        return { reply: result.error };
+    }
+
+    return { reply: result.reply };
 }
 
 async function createReminder(msg) {

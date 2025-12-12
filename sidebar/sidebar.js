@@ -27,8 +27,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
 function setupGlobalListeners() {
     document.getElementById('close-btn').addEventListener('click', () => {
-        // Send message to background to forward to content script
-        chrome.runtime.sendMessage({ action: "CLOSE_SIDEBAR" });
+        // Send message to content script key "parent"
+        window.parent.postMessage({ action: "CLOSE_SIDEBAR" }, "*");
     });
 
 
