@@ -22,7 +22,13 @@ export async function generateGeminiReply(systemPrompt, userMessage, context) {
         }
     };
 
+    if (context.useGrounding) {
+        payload.tools = [{ google_search: {} }];
+    }
+
     try {
+        console.log("Gemini API: Sending request to", API_URL);
+        console.log("Gemini API: Payload", JSON.stringify(payload));
         const response = await fetch(API_URL, {
             method: "POST",
             headers: { "Content-Type": "application/json" },

@@ -22,8 +22,11 @@ chrome.runtime.onInstalled.addListener(() => {
 // ---- Message Handling ----
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     // 1. AI Actions
+    // 1. AI Actions
     if (message.action.startsWith("REQUEST_")) {
-        handleAIRequest(message).then(response => sendResponse(response));
+        handleAIRequest(message)
+            .then(response => sendResponse(response))
+            .catch(error => sendResponse({ data: "Error: " + error.message }));
         return true; // async response
     }
 
@@ -62,38 +65,146 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 // ---- Core Logic Stubs ----
 
 async function handleAIRequest(msg) {
-    // Simulate network delay for UI feedback
-    await new Promise(r => setTimeout(r, 1000));
+    // No delay
 
-    let text = "";
+    let responseData = "";
 
-    switch (msg.action) {
-        case "REQUEST_SUMMARY": // Blog
-            text = "📌 Summary of this article:\n\nThis article discusses the importance of context-aware UI patterns. It highlights how Loom and others utilize sidebar interfaces to maintain user flow without blocking content. \n\nKey takeaways:\n- Sidebars > Modals for reference tasks\n- Context detection improves UX\n- Animation timing matters (300ms)";
-            break;
-        case "REQUEST_KEYPOINTS":
-            text = "• Sidebar UI patterns are trending\n• Reactivity to page context is key\n• Non-blocking overlay strategies";
-            break;
-        case "REQUEST_PRODUCT_COMPARISON": // Marketplace
-            text = "💰 Price Comparison:\n- Amazon: $29.99\n- eBay: $24.50 (Used)\n- Official Store: $35.00\n\nRecommendation: eBay offers best value if you don't mind open-box.";
-            break;
-        case "REQUEST_SIMILAR_ITEMS": // Marketplace
-            text = "🔍 Similar Items:\n1. Logitech MX Master 3S - $99\n2. Keychron K2 Pro - $89\n3. Dell UltraSharp 27 - $450";
-            break;
-        case "REQUEST_CODE_EXPLAIN": // Dev
-            text = "💡 Code Explanation:\nThis function uses a heuristics-based approach to classify the current DOM. It checks for specific store indicators (meta tags) and developer site hostnames to determine the `pageType` string.";
-            break;
-        case "REQUEST_CODE_DEBUG":
-            text = "🐛 Potential Bug:\nThe regex used for creating URL validation might miss edge cases with international domains. Consider using the `URL` API instead of string parsing.";
-            break;
-        case "REQUEST_SIMILAR_COURSES": // Online Course
-            text = "📚 Similar Courses:\n1. Python for Everybody (Coursera)\n2. Machine Learning by Andrew Ng (Coursera)\n3. Complete Python Bootcamp (Udemy)\n4. Intro to Computer Science (Udacity)\n\nRecommendation: 'Python for Everybody' is a great starting point.";
-            break;
-        default:
-            text = "Processed request: " + msg.action;
+    try {
+        console.log("Service Worker: Handling AI Request", msg.action);
+        switch (msg.action) {
+            case "REQUEST_SUMMARY": // Blog
+                responseData = "📌 Summary of this article:\n\nThis article discusses the importance of context-aware UI patterns. It highlights how Loom and others utilize sidebar interfaces to maintain user flow without blocking content. \n\nKey takeaways:\n- Sidebars > Modals for reference tasks\n- Context detection improves UX\n- Animation timing matters (300ms)";
+                break;
+            case "REQUEST_KEYPOINTS":
+                responseData = "• Sidebar UI patterns are trending\n• Reactivity to page context is key\n• Non-blocking overlay strategies";
+                break;
+            case "REQUEST_PRODUCT_COMPARISON": // Marketplace
+                responseData = "💰 Price Comparison:\n- Amazon: $29.99\n- eBay: $24.50 (Used)\n- Official Store: $35.00\n\nRecommendation: eBay offers best value if you don't mind open-box.";
+                break;
+            case "REQUEST_SIMILAR_ITEMS": // Marketplace - "Price Check & Compare"
+                // 1. SEARCH: Ask Gemini with Grounding
+                console.log("Service Worker: Processing PRICE_CHECK");
+                const product = msg.payload?.product || {};
+                const searchPrompt = `I want to buy "${product.title || 'this item'}". \n\nSearch (using Google Grounding) for the current price of this specific product at major retailers like Amazon, Walmart, Best Buy, eBay, and official stores.\n\nProvide the list of retailers found, their listed price if visible to you, and the DIRECT link to the product page.`;
+
+                console.log("Service Worker: Step 1 - Search Prompt...", searchPrompt);
+
+                // Race against timeout
+                const timeoutPromise = new Promise(resolve => setTimeout(() => resolve({ error: "Request timed out after 25s" }), 25000));
+                const searchApiPromise = generateGeminiReply("You are a shopping assistant. Find prices.", searchPrompt, { url: msg.url, pageType: msg.pageType, useGrounding: true });
+
+                const searchResult = await Promise.race([searchApiPromise, timeoutPromise]);
+                console.log("Service Worker: Step 1 Result", searchResult);
+
+                if (searchResult.error) {
+                    responseData = searchResult.error;
+                    break;
+                }
+
+                // 2. SCRAPE: Verify prices via Offscreen
+                let scrapedData = [];
+                try {
+                    await setupOffscreenDocument('offscreen/offscreen.html');
+
+                    const urlRegex = /(https?:\/\/[^\s)]+)/g;
+                    const links = searchResult.reply.match(urlRegex) || [];
+                    const uniqueLinks = [...new Set(links)].filter(l => !l.includes('google.com/search')).slice(0, 3);
+
+                    if (uniqueLinks.length > 0) {
+                        console.log("Service Worker: Step 2 - Scraping links...", uniqueLinks);
+
+                        for (const link of uniqueLinks) {
+                            try {
+                                const scrapeResponse = await chrome.runtime.sendMessage({ action: "SCRAPE_URL", url: link });
+                                if (scrapeResponse && scrapeResponse.success) {
+                                    scrapedData.push({
+                                        url: link,
+                                        title: scrapeResponse.data.title,
+                                        price: scrapeResponse.data.price || "Price not detected"
+                                    });
+                                } else {
+                                    scrapedData.push({ url: link, error: "Connection failed" });
+                                }
+                            } catch (e) {
+                                console.warn("Scrape error", link, e);
+                            }
+                        }
+                    }
+                } catch (err) {
+                    console.warn("Offscreen Step Failed:", err);
+                }
+
+                // 3. FORMAT: Ask Gemini to present the final data
+                console.log("Service Worker: Step 3 - Formatting...");
+                const formatPrompt = `
+                I have the following product data found for "${product.title}":
+
+                ${JSON.stringify(scrapedData, null, 2)}
+
+                Original AI Search Result:
+                ${searchResult.reply}
+
+                INSTRUCTION:
+                Create a concise, beautiful list of these buying options. 
+                For each option, show the Store/Product Name, the Verified Price (from the scraped data if available), and the Link.
+                
+                CRITICAL RULES:
+                1. DO NOT CHANGE THE LINKS AT ALL. Use the exact URLs provided in the JSON/text.
+                2. If a price was verified (in the JSON), use that and add a ✅ emoji.
+                3. Format as a clean list or bullet points.
+                `;
+
+                const formatResult = await generateGeminiReply("You are a formatter. Do not hallucinate links.", formatPrompt, { url: msg.url, pageType: msg.pageType });
+
+                responseData = formatResult.reply || formatResult.error;
+                break;
+            case "REQUEST_README_SUMMARY": // Dev via Auto-Init
+                console.log("Service Worker: Summarizing README...");
+                const readme = msg.payload?.readme || "No README found.";
+                const readmePrompt = `You are a savvy technical lead. Summarize this README file for a developer audience. 
+                
+                Structure:
+                1. **What is it?** (1 sentence)
+                2. **Key Features** (Bullet points)
+                3. **Installation/Usage** (Quick summary)
+                
+                README Content:
+                ${readme}`;
+
+                const readmeResult = await generateGeminiReply("You are a tech lead.", readmePrompt, { url: msg.url, pageType: msg.pageType });
+                responseData = readmeResult.reply || readmeResult.error;
+                break;
+            case "REQUEST_CODE_EXPLAIN": // Dev
+                console.log("Service Worker: Explaining Code...");
+                const codeToExplain = msg.payload?.code || "No code provided.";
+                const explainPrompt = `Explain this code snippet concisely. proper markdown. \n\n${codeToExplain.substring(0, 5000)}`;
+                const explainRes = await generateGeminiReply("You are a senior developer.", explainPrompt, { url: msg.url, pageType: msg.pageType });
+                responseData = explainRes.reply || explainRes.error;
+                break;
+            case "REQUEST_DOCS": // Dev - Find Docs
+                console.log("Service Worker: Finding Docs...");
+                const codeForDocs = msg.payload?.code || "No code provided.";
+                const docsPrompt = `Identify the library, framework, or command used in this code/command. 
+                Provide a summary of what it does and a direct link to the **Official Documentation** for it.
+                
+                Code Snippet:
+                ${codeForDocs.substring(0, 2000)}`;
+
+                const docsRes = await generateGeminiReply("You are a documentation expert. Provide official links.", docsPrompt, { url: msg.url, pageType: msg.pageType, useGrounding: true });
+                responseData = docsRes.reply || docsRes.error;
+                break;
+            case "REQUEST_SIMILAR_COURSES": // Online Course
+                responseData = "📚 Similar Courses:\n1. Python for Everybody (Coursera)\n2. Machine Learning by Andrew Ng (Coursera)\n3. Complete Python Bootcamp (Udemy)\n4. Intro to Computer Science (Udacity)\n\nRecommendation: 'Python for Everybody' is a great starting point.";
+                break;
+            default:
+                responseData = "Processed request: " + msg.action;
+        }
+    } catch (e) {
+        console.error("AI Request Error: ", e);
+        responseData = "Error processing request: " + e.message;
     }
 
-    return { data: text };
+    return { data: responseData };
 }
 
 async function handleChat(msg) {
@@ -158,3 +269,35 @@ chrome.alarms.onAlarm.addListener((alarm) => {
         chrome.runtime.sendMessage({ action: "REMINDER_TRIGGERED", title: "Saved Page" });
     }
 });
+
+// ---- Offscreen API Management ----
+let creatingOffscreen; // Promise to prevent race conditions
+
+async function setupOffscreenDocument(path) {
+    if (!(chrome && chrome.runtime && chrome.runtime.getContexts)) {
+        console.warn("Offscreen API not available (Chrome < 109)");
+        return;
+    }
+    // Check if offscreen document already exists
+    const existingContexts = await chrome.runtime.getContexts({
+        contextTypes: ['OFFSCREEN_DOCUMENT'],
+        documentUrls: [path]
+    });
+
+    if (existingContexts.length > 0) {
+        return;
+    }
+
+    // Create if not exists
+    if (creatingOffscreen) {
+        await creatingOffscreen;
+    } else {
+        creatingOffscreen = chrome.offscreen.createDocument({
+            url: path,
+            reasons: ['DOM_SCRAPING'],
+            justification: 'Scraping product data from competitor sites in background.'
+        });
+        await creatingOffscreen;
+        creatingOffscreen = null;
+    }
+}

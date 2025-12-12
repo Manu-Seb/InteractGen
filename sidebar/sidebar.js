@@ -3,17 +3,24 @@
 // State
 let currentPageType = "generic";
 let currentUrl = "";
+let currentProductData = {};
+let currentCodeContent = "";
 
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
     // Listen for messages from parent (content script) or background
     chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         if (message.action === "INIT_SIDEBAR") {
-            currentPageType = message.pageType;
-            currentUrl = message.url;
-            updateUI();
+            initializeSidebar(message);
         } else if (message.action === "UPDATE_SIDEBAR_CONTENT") {
             handleContentUpdate(message.data);
+        }
+    });
+
+    // Also listen for direct window messages (more reliable from content script)
+    window.addEventListener("message", (event) => {
+        if (event.data.action === "INIT_SIDEBAR") {
+            initializeSidebar(event.data);
         }
     });
 
@@ -21,14 +28,33 @@ document.addEventListener('DOMContentLoaded', () => {
     setupGlobalListeners();
 });
 
+function initializeSidebar(data) {
+    currentPageType = data.pageType;
+    currentUrl = data.url;
+    if (data.productData) currentProductData = data.productData;
+
+    // Crucial: Set code content from initialization data
+    if (data.codeContent) {
+        currentCodeContent = data.codeContent;
+        console.log("Sidebar: Code content loaded", currentCodeContent.substring(0, 50));
+    } else {
+        currentCodeContent = "";
+    }
+
+    updateUI();
+
+    // Auto-Action: If README content is provided, summarize it immediately
+    if (data.readmeContent) {
+        performAction('summarize_readme', { readme: data.readmeContent });
+    }
+}
+
 function setupGlobalListeners() {
     document.getElementById('close-btn').addEventListener('click', () => {
-        // Send message to content script key "parent"
         window.parent.postMessage({ action: "CLOSE_SIDEBAR" }, "*");
     });
 
-
-    // Event Delegation for Dynamic Content
+    // Event Delegation
     document.getElementById('main-content').addEventListener('click', (e) => {
         // 1. Tabs
         const tabBtn = e.target.closest('.tab-btn');
@@ -57,7 +83,7 @@ function setupGlobalListeners() {
             return;
         }
 
-        // 5. Research - Add Session
+        // 5. Research
         if (e.target.id === 'add-session-btn') {
             addToResearchSession();
             return;
@@ -87,14 +113,13 @@ function updateUI() {
     if (template) {
         const clone = template.content.cloneNode(true);
         main.appendChild(clone);
-        // Note: Event delegation in setupGlobalListeners handles clicks now
     }
 
     // Toggle footer
     const footer = document.getElementById('footer-input');
     if (currentPageType === "generic") {
         footer.classList.remove('hidden');
-        loadChatHistory(); // Restore chat when generic template is loaded
+        loadChatHistory();
         loadSavedPages();
     } else {
         footer.classList.add('hidden');
@@ -102,11 +127,9 @@ function updateUI() {
 }
 
 function showTab(tabName) {
-    // Hide all
     document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
     document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
 
-    // Show target
     const content = document.getElementById(`tab-${tabName}`);
     const btn = document.querySelector(`.tab-btn[data-tab="${tabName}"]`);
 
@@ -117,64 +140,82 @@ function showTab(tabName) {
 }
 
 // Actions -> Background
-function performAction(actionName) {
-    // Show loading
+function performAction(actionName, extraPayload = {}) {
     const resultBox = document.querySelector('.result-box');
     if (resultBox) {
         resultBox.classList.remove('hidden');
-        resultBox.innerHTML = '<div class="spinner"></div> Processing...';
+        resultBox.innerHTML = '<div class="spinner"></div> Analyze & summarize...';
     }
 
-    // Map short action names to full event names
     const actionMap = {
         'summarize': 'REQUEST_SUMMARY',
+        'summarize_readme': 'REQUEST_README_SUMMARY',
         'keypoints': 'REQUEST_KEYPOINTS',
         'compare': 'REQUEST_PRODUCT_COMPARISON',
         'explain': 'REQUEST_CODE_EXPLAIN',
-        'bugs': 'REQUEST_CODE_DEBUG',
-        'similar-courses': 'REQUEST_SIMILAR_COURSES'
+        'docs': 'REQUEST_DOCS', // Changed from bugs
+        'similar-courses': 'REQUEST_SIMILAR_COURSES',
+        'similar': 'REQUEST_SIMILAR_ITEMS'
     };
 
     const fullAction = actionMap[actionName] || actionName.toUpperCase();
 
+    const payload = { ...extraPayload };
+    if (fullAction === 'REQUEST_SIMILAR_ITEMS') {
+        payload.product = currentProductData;
+    }
+    if (['REQUEST_CODE_EXPLAIN', 'REQUEST_DOCS'].includes(fullAction)) {
+        payload.code = currentCodeContent || "No visible code found on page.";
+    }
+
+    console.log("Sidebar: Sending message", fullAction, payload);
     chrome.runtime.sendMessage({
         action: fullAction,
         pageType: currentPageType,
         url: currentUrl,
-        payload: { /* could contain selected text etc */ }
+        payload: payload
     }, (response) => {
+        console.log("Sidebar: Received response", response);
+
         if (chrome.runtime.lastError) {
-            console.error(chrome.runtime.lastError);
+            console.error("Sidebar Error Message:", chrome.runtime.lastError.message);
+            console.error("Sidebar Error Object:", JSON.stringify(chrome.runtime.lastError));
+            if (resultBox) resultBox.innerText = "Error: " + chrome.runtime.lastError.message;
             return;
         }
-        // Handle immediate response or wait for async update
+
         if (response && response.data) {
             handleContentUpdate(response.data);
+        } else {
+            console.warn("Sidebar: Empty response received");
+            if (resultBox) resultBox.innerText = "Error: No response from AI service. Please check your connection or API key.";
         }
     });
 }
 
 function handleContentUpdate(data) {
-    // Generic handler to dump text into the result box
     const boxes = document.querySelectorAll('.result-box');
-    // For now update all visible result boxes
     boxes.forEach(box => {
         if (!box.classList.contains('hidden')) {
-            box.innerText = data; // Plain text for now
+            box.innerHTML = linkify(data).replace(/\n/g, '<br>');
         }
+    });
+}
+
+function linkify(text) {
+    const urlRegex = /(\b(https?|ftp|file):\/\/[-A-Z0-9+&@#\/%?=~_|!:,.;]*[-A-Z0-9+&@#\/%=~_|])/ig;
+    return text.replace(urlRegex, function (url) {
+        return '<a href="' + url + '" target="_blank">' + url + '</a>';
     });
 }
 
 // Chat
 async function loadChatHistory() {
-    console.log("Sidebar: Loading chat history...");
     try {
         const data = await chrome.storage.session.get("chatHistory");
-        console.log("Sidebar: Got history data:", data);
         const history = data.chatHistory || [];
         if (history.length > 0) {
-            console.log(`Sidebar: Restoring ${history.length} messages`);
-            history.forEach(msg => addChatMessage(msg.text, msg.role, false)); // Don't re-save
+            history.forEach(msg => addChatMessage(msg.text, msg.role, false));
         }
     } catch (e) {
         console.error("Sidebar: Session storage error:", e);
@@ -189,13 +230,11 @@ function sendChatMessage() {
     addChatMessage(msg, 'user');
     input.value = "";
 
-    // Send to background
     chrome.runtime.sendMessage({
         action: "SEND_CHAT",
         message: msg,
         context: { url: currentUrl, pageType: currentPageType }
     }, (response) => {
-        // Echo response
         if (response && response.reply) {
             addChatMessage(response.reply, 'assistant');
         }
@@ -225,17 +264,16 @@ function addChatMessage(text, role, save = true) {
 function saveCurrentPage() {
     const pageData = {
         url: currentUrl,
-        title: document.title || currentUrl, // Ideally passed from content script, but URL works for now
+        title: document.title || currentUrl,
         timestamp: Date.now()
     };
 
     chrome.storage.local.get("savedPages", (data) => {
         const list = data.savedPages || [];
-        // Check duplicate
         if (!list.some(p => p.url === currentUrl)) {
             list.push(pageData);
             chrome.storage.local.set({ savedPages: list }, () => {
-                loadSavedPages(); // Refresh UI
+                loadSavedPages();
                 alert("Page saved!");
             });
         } else {
@@ -253,7 +291,7 @@ function loadSavedPages() {
         ul.innerHTML = "";
         list.forEach(page => {
             const li = document.createElement('li');
-            li.className = "list-item"; // Reuse existing styles if possible or generic
+            li.className = "list-item";
             li.style.padding = "8px";
             li.style.borderBottom = "1px solid #eee";
             li.innerHTML = `<a href="${page.url}" target="_blank" style="text-decoration:none; color:black; font-weight:500;">${new URL(page.url).hostname}</a><br><small>${new Date(page.timestamp).toLocaleDateString()}</small>`;
@@ -267,10 +305,9 @@ function addToResearchSession() {
     chrome.runtime.sendMessage({
         action: "ADD_TO_RESEARCH",
         url: currentUrl,
-        title: document.title, // In real app, pass title from content script or query it
+        title: document.title,
         pageType: currentPageType
     }, () => {
-        // Optimistic UI update
         const list = document.getElementById('research-list');
         const item = document.createElement('div');
         item.style.padding = "8px";

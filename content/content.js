@@ -146,18 +146,71 @@ function injectSidebar() {
     shadowRoot.appendChild(toggleBtn);
 }
 
-function toggleSidebar(open) {
+// ... (existing code) ...
+
+function extractProductData() {
+    // 1. Title
+    let title = document.title;
+    const titleEl = document.querySelector("#productTitle") || document.querySelector("h1");
+    if (titleEl) title = titleEl.innerText.trim();
+
+    // 2. Price
+    let price = "N/A";
+    const priceSelectors = [
+        "#priceblock_ourprice",
+        "#priceblock_dealprice",
+        ".a-price .a-offscreen",
+        ".price",
+        "[itemprop='price']",
+        "meta[property='og:price:amount']",
+        "meta[property='product:price:amount']"
+    ];
+
+    for (const sel of priceSelectors) {
+        const el = document.querySelector(sel);
+        if (el) {
+            price = el.innerText || el.content || "N/A";
+            if (price !== "N/A") break;
+        }
+    }
+
+    return { title, price };
+}
+
+function extractReadme() {
+    const readmeEl = document.querySelector(".markdown-body") || document.querySelector("article");
+    if (readmeEl) {
+        return readmeEl.innerText.substring(0, 15000);
+    }
+    return null;
+}
+
+
+async function toggleSidebar(open) {
     sidebarOpen = open;
     if (open) {
         sidebarIframe.classList.add('open');
-        // Shadow Host is already full width/height with pointer-events: none
-        // Iframe has pointer-events: auto, so it handles interaction.
+
+        // Extract Data based on Page Type
+        let payload = {};
+        if (detectedPageType === "marketplace") {
+            payload = extractProductData();
+        } else if (detectedPageType === "dev") {
+            const readmeText = extractReadme();
+            if (readmeText) payload.readmeContent = readmeText;
+
+            // Updated: Async Code Extraction to support Raw Fetching
+            const visualCode = await extractCodeAsync();
+            if (visualCode) payload.codeContent = visualCode;
+        }
 
         // Initialize sidebar state
         sendToSidebar({
             action: "INIT_SIDEBAR",
             pageType: detectedPageType,
-            url: window.location.href
+            url: window.location.href,
+            productData: payload.productData,
+            ...payload
         });
 
     } else {
@@ -165,27 +218,98 @@ function toggleSidebar(open) {
     }
 }
 
+async function extractCodeAsync() {
+    console.log("Sidebar: Attempting to extract code (Async)...");
+
+    // Strategy 1: Fetch Raw Content (Best for GitHub)
+    // Looks for the "Raw" button and fetches the URL directly
+    try {
+        const rawButton =
+            document.querySelector('a[data-testid="raw-button"]') ||
+            document.querySelector('a[href*="/raw/"]');
+
+        if (rawButton && rawButton.href) {
+            console.log("Sidebar: Found Raw button, fetching...", rawButton.href);
+            const response = await fetch(rawButton.href);
+            if (response.ok) {
+                const text = await response.text();
+                if (text.length > 0) {
+                    console.log("Sidebar: Successfully fetched raw content");
+                    return text.substring(0, 15000); // Limit size
+                }
+            } else {
+                console.warn("Sidebar: Failed to fetch raw content", response.status);
+            }
+        }
+    } catch (e) {
+        console.error("Sidebar: Error fetching raw content", e);
+    }
+
+    // Fallback: Synchronous DOM Extraction
+    return extractVisibleCodeSync();
+}
+
+function extractVisibleCodeSync() {
+    console.log("Sidebar: Fallback to DOM extraction...");
+
+    // Strategy 2: GitHub Blob Wrapper (Specific & Reliable)
+    const containers = [
+        '[data-component="file-content"]', // New GitHub
+        '.blob-wrapper',    // Old GitHub
+        '.react-code-blob',
+        '.js-file-line-container'
+    ];
+
+    for (const selector of containers) {
+        const el = document.querySelector(selector);
+        if (el) {
+            console.log("Sidebar: Found container", selector);
+            return el.innerText.substring(0, 15000);
+        }
+    }
+
+    // Strategy 3: GitHub Raw/TextArea (Fallback)
+    const rawTextArea = document.querySelector('textarea[readOnly]');
+    if (rawTextArea && rawTextArea.value.length > 50) {
+        console.log("Sidebar: Found raw textarea code");
+        return rawTextArea.value.substring(0, 15000);
+    }
+
+    // Strategy 4: StackOverflow / Generic
+    const codes = document.querySelectorAll('pre code, .code-snippet, pre.prettyprint');
+    let largest = "";
+    codes.forEach(c => {
+        if (c.innerText.length > largest.length) {
+            largest = c.innerText;
+        }
+    });
+    if (largest.length > 50) {
+        console.log("Sidebar: Found generic code block");
+        return largest.substring(0, 10000);
+    }
+
+    // Strategy 5: Fallback generic PRE
+    const pre = document.querySelector('pre');
+    if (pre && pre.innerText.length > 50) {
+        console.log("Sidebar: Found generic PRE");
+        return pre.innerText.substring(0, 10000);
+    }
+
+    console.log("Sidebar: No code found");
+    return null;
+}
+
+// ... (existing code) ...
+
 function sendToSidebar(msg) {
     if (sidebarIframe && sidebarIframe.contentWindow) {
-        // chrome.runtime messaging is usually better for iframe part of extension 
-        // but postMessage also works. Since sidebar is an extension page, we can use runtime.
-        // However, we can't easily target a specific iframe with runtime.sendMessage unless we identify it.
-        // Sending directly via runtime to the extension logic in the iframe is cleanest.
-        // BUT: Content scripts can't send message TO other extension views directly easily without background relay.
-        // Use postMessage to iframe window
-        // sidebarIframe.contentWindow.postMessage(msg, chrome.runtime.getURL("")); 
-        // The iframe is on chrome-extension://origin.
-        // Let's use runtime messaging from Background -> Sidebar, but for Content -> Sidebar, 
-        // it's often easier to route through background OR use window.postMessage if we know the origin.
+        // Use postMessage for direct Parent -> Iframe communication
+        // This is more reliable than runtime.sendMessage which goes through background
+        const targetOrigin = chrome.runtime.getURL(""); // chrome-extension://...
+        sidebarIframe.contentWindow.postMessage(msg, targetOrigin);
 
-        // Let's try runtime.sendMessage to background, which then forwards to sidebar? 
-        // No, simpler: Content -> Iframe via postMessage is standard for parent->child.
-        // BUT sidebar is cross-origin to the page (extension origin).
-        // So we must use targetOrigin = chrome.runtime.getURL("")
-
-        // Actually, the Sidebar listens to chrome.runtime.onMessage. 
-        // Does sending from content script trigger that in extension pages? Yes.
-        chrome.runtime.sendMessage(msg);
+        // Redundant fallback (optional, but harmless)
+        // chrome.runtime.sendMessage(msg); 
     }
 }
 
