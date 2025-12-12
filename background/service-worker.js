@@ -2,6 +2,7 @@
 
 // Import detection logic if needed, but we mostly trust the message payload
 // import { detectPageType } from '../utils/page-detector.js'; 
+import { GEMINI_API_KEY } from '../config.js';
 
 // ---- Setup & Install ----
 chrome.runtime.onInstalled.addListener(() => {
@@ -51,6 +52,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 async function handleAIRequest(msg) {
     // Simulate network delay
     await new Promise(r => setTimeout(r, 1500));
+
+    if (GEMINI_API_KEY === "YOUR_GEMINI_API_KEY_HERE") {
+        console.warn("Gemini API Key is missing in config.js");
+    } else {
+        console.log("Using Gemini API Key: " + GEMINI_API_KEY.substring(0, 4) + "...");
+        // TODO: Implement actual fetch request to Gemini API here
+    }
 
     const type = msg.pageType;
     let text = "";

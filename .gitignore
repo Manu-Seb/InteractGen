@@ -1,0 +1,10 @@
+# Dependencies
+node_modules/
+.DS_Store
+
+# Environment / Secrets
+config.js
+*.env
+
+# Build artifacts
+dist/

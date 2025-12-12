@@ -31,9 +31,6 @@ function setupGlobalListeners() {
         window.parent.postMessage({ action: "CLOSE_SIDEBAR" }, "*");
     });
 
-    document.getElementById('minimize-btn').addEventListener('click', () => {
-        window.parent.postMessage({ action: "MINIMIZE_SIDEBAR" }, "*");
-    });
 
     document.getElementById('send-btn').addEventListener('click', sendChatMessage);
     document.getElementById('user-input').addEventListener('keypress', (e) => {
