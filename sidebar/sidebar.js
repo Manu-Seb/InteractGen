@@ -200,17 +200,18 @@ function handleContentUpdate(data) {
     const boxes = document.querySelectorAll('.result-box');
     boxes.forEach(box => {
         if (!box.classList.contains('hidden')) {
-            box.innerHTML = linkify(data).replace(/\n/g, '<br>');
+            // Use marked.parse to render Markdown
+            // Optional: Configure marked if needed, but defaults are usually fine
+            try {
+                box.innerHTML = marked.parse(data);
+            } catch (e) {
+                console.error("Markdown parsing error:", e);
+                box.textContent = data; // Fallback
+            }
         }
     });
 }
-
-function linkify(text) {
-    const urlRegex = /(\b(https?|ftp|file):\/\/[-A-Z0-9+&@#\/%?=~_|!:,.;]*[-A-Z0-9+&@#\/%=~_|])/ig;
-    return text.replace(urlRegex, function (url) {
-        return '<a href="' + url + '" target="_blank">' + url + '</a>';
-    });
-}
+// Removed linkify() as marked handles links
 
 // Chat
 async function loadChatHistory() {
@@ -250,7 +251,17 @@ function addChatMessage(text, role, save = true) {
 
     const div = document.createElement('div');
     div.className = `chat-msg ${role}`;
-    div.textContent = text;
+
+    if (role === 'assistant') {
+        try {
+            div.innerHTML = marked.parse(text);
+        } catch (e) {
+            div.textContent = text;
+        }
+    } else {
+        div.textContent = text; // User input as plain text for safety
+    }
+
     history.appendChild(div);
     history.scrollTop = history.scrollHeight;
 

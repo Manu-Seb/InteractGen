@@ -181,6 +181,82 @@ async function handleAIRequest(msg) {
                 const explainRes = await generateGeminiReply("You are a senior developer.", explainPrompt, { url: msg.url, pageType: msg.pageType });
                 responseData = explainRes.reply || explainRes.error;
                 break;
+            case "REQUEST_CODE_EXPLAIN": // Dev - Explain Code
+                // ... (existing)
+                break; // implicit in existing code, but ensure I insert properly.
+
+            case "SEND_CHAT":
+                console.log("Service Worker: Chat Message Received:", msg.message);
+                // 1. Intent Detection
+                detectChatIntent(msg.message, GEMINI_API_KEY) // Pass GEMINI_API_KEY
+                    .then(async (intent) => {
+                        console.log("Service Worker: Chat Intent:", intent);
+
+                        if (intent.isTask) {
+                            // 2. Route to DOM Agent
+                            console.log("Service Worker: Routing to DOM Agent...");
+                            try {
+                                let tabId = sender.tab?.id;
+                                if (!tabId) {
+                                    // Fallback: Query active tab
+                                    const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+                                    tabId = tabs[0]?.id;
+                                }
+
+                                if (tabId) {
+                                    // Send to content script
+                                    const agentRes = await chrome.tabs.sendMessage(tabId, {
+                                        action: "EXECUTE_AGENT_TASK",
+                                        goal: intent.taskGoal || msg.message // Fallback to raw message
+                                    });
+
+                                    // 3. Formulate Reply based on Agent Result
+                                    let replyText = "";
+                                    if (agentRes && agentRes.success) {
+                                        // Agent thinks it succeeded
+                                        if (agentRes.result && agentRes.result.history && agentRes.result.history.length > 0) {
+                                            replyText = "✅ **Task Complete**\n\nActions taken:\n" +
+                                                agentRes.result.history.map(h => `- ${h.action} on ${h.selector}`).join('\n');
+                                        } else {
+                                            replyText = "✅ **Task Complete** (No visible actions recorded)";
+                                        }
+                                    } else {
+                                        replyText = "⚠️ **Task Failed**\n\n" + (agentRes?.error || "Unknown error");
+                                    }
+                                    sendResponse({ reply: replyText });
+                                } else {
+                                    throw new Error("No active tab found for agent.");
+                                }
+                            } catch (e) {
+                                console.error("Agent Execution Error:", e);
+                                sendResponse({ reply: "I tried to run the agent but encountered an error: " + e.message });
+                            }
+                        } else {
+                            // 3. Normal Chat (Fallback)
+                            const chatSystemInstruction = "You are a helpful AI assistant in a browser sidebar. Concise answers.";
+                            // Assuming history is handled by the client or we pass simple context
+                            const chatRes = await generateGeminiReply(chatSystemInstruction, msg.message, { ...msg.context }, sender.tab?.id);
+                            sendResponse({ reply: chatRes.reply || chatRes.error });
+                        }
+                    })
+                    .catch(err => {
+                        console.error("Intent Detection Error:", err);
+                        // Fallback to normal chat
+                        generateGeminiReply("You are a helpful assistant.", msg.message, { ...msg.context }, sender.tab?.id)
+                            .then(r => sendResponse({ reply: r.reply }))
+                            .catch(e => sendResponse({ error: e.message }));
+                    });
+                return true; // Async // Async response
+
+            case "REQUEST_AGENT_PLAN":
+                console.log("Service Worker: Agent Planning...");
+                const agentPrompt = msg.prompt;
+                // We use the raw prompt directly
+                generateGeminiReply(agentPrompt, [], "", sender.tab?.id)
+                    .then(reply => sendResponse({ data: reply }))
+                    .catch(err => sendResponse({ error: err.message }));
+                return true; // Async response
+
             case "REQUEST_DOCS": // Dev - Find Docs
                 console.log("Service Worker: Finding Docs (AI Search)...");
                 const codeForDocs = msg.payload?.code || "No code provided.";
@@ -225,6 +301,40 @@ async function handleChat(msg) {
     }
 
     return { reply: result.reply };
+}
+
+async function detectChatIntent(userMessage, apiKeyOverride = null) {
+    const prompt = `
+    Analyze this user message: "${userMessage}"
+    Is the user asking to perform an action on the web page (like "fill form", "click button", "search for X")?
+    Or is it a general question/chat (like "explain this code", "summarize page", "hello")?
+
+    Examples:
+    - "Fill this form" -> isTask: true
+    - "Search for red shoes" -> isTask: true
+    - "Click the sign up button" -> isTask: true
+    - "What is the page title?" -> isTask: false (question)
+    - "Summarize this article" -> isTask: false (summary)
+
+    Return JSON ONLY:
+    {
+        "isTask": boolean,
+        "taskGoal": "Refined goal string if it is a task, else null"
+    }
+    `;
+
+    // We reuse generateGeminiReply but simpler
+    try {
+        const response = await generateGeminiReply("You are an intent classifier.", prompt, {}, null);
+        let text = response.reply || "";
+        if (text.includes('```json')) {
+            text = text.replace(/```json/g, '').replace(/```/g, '');
+        }
+        return JSON.parse(text);
+    } catch (e) {
+        console.warn("Intent detection failed, assuming chat.", e);
+        return { isTask: false };
+    }
 }
 
 async function createReminder(msg) {

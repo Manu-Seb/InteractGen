@@ -20,6 +20,70 @@
             border-bottom: 1px solid #ccc;
             padding-bottom: 10px;
         }
+
+        .data-management {
+            margin-bottom: 20px;
+            background: #f9fafb;
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #eee;
+        }
+
+        .add-row {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .small-input {
+            width: 120px;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
+        .large-input {
+            flex: 1;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
+        .secondary-btn {
+            background: #eef2ff;
+            color: #6366f1;
+            border: 1px solid #6366f1;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .data-list {
+            list-style: none;
+            padding: 0;
+            border: 1px solid #eee;
+            border-radius: 4px;
+        }
+
+        .data-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+            align-items: center;
+        }
+
+        .data-item:last-child {
+            border-bottom: none;
+        }
+
+        .delete-btn {
+            background: none;
+            border: none;
+            color: #ef4444;
+            cursor: pointer;
+            font-size: 18px;
+        }
     </style>
 </head>
 
@@ -27,16 +91,29 @@
     <h1>AI Assistant Settings</h1>
 
     <div id="settings-area">
-        <label>
-            API Key (Optional):
-            <input type="password" id="apiKey" placeholder="Paste your Gemini API Key here"
-                style="width: 100%; margin-top: 5px;">
-            <small style="display: block; color: #666; margin-top: 5px;">
-                Get your key from <a href="https://aistudio.google.com/app/apikey" target="_blank">Google AI Studio</a>.
-                Leave empty to use the built-in key.
-            </small>
-        </label>
-        <hr style="margin: 20px 0; border: 0; border-top: 1px solid #eee;">
+        <div class="form-group">
+            <label for="apiKey">Gemini API Key</label>
+            <input type="password" id="apiKey" placeholder="Enter your API key">
+            <p class="hint">Get your key from <a href="https://aistudio.google.com/" target="_blank">Google AI
+                    Studio</a></p>
+        </div>
+
+        <hr>
+
+        <h2>Personal Data for Autofill</h2>
+        <p class="hint">The AI Agent will ONLY use this data to fill forms. Be specific (e.g., "Home Address", "Work
+            Email").</p>
+
+        <div class="data-management">
+            <div class="add-row">
+                <input type="text" id="newKey" placeholder="Key (e.g. Name)" class="small-input">
+                <input type="text" id="newValue" placeholder="Value (e.g. John Doe)" class="large-input">
+                <button id="addDataBtn" class="secondary-btn">Add</button>
+            </div>
+            <ul id="userDataList" class="data-list"></ul>
+        </div>
+
+        <hr>
 
         <label>
             <input type="checkbox" id="enableSidebar" checked> Enable Floating Button

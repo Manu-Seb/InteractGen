@@ -55,6 +55,28 @@ let detectedPageType = "generic";
             // Forward to sidebar
             setTimeout(() => sendToSidebar({ action: "UPDATE_SIDEBAR_CONTENT", data: "Analyzing selection..." }), 500);
         }
+
+        // 5. Agent Task Execution (Chat Triggered)
+        if (msg.action === "EXECUTE_AGENT_TASK") {
+            const { goal } = msg;
+            console.log("Sidebar: Received Agent Task:", goal);
+
+            // Ensure Agent is available
+            if (window.domAgent) {
+                // We need to return a Promise for sendResponse if we await async work
+                // But runtime.onMessage async handling requires returning true
+                window.domAgent.performTask(goal, {})
+                    .then(result => {
+                        sendResponse({ success: true, result });
+                    })
+                    .catch(error => {
+                        sendResponse({ success: false, error: error.message });
+                    });
+                return true; // Keep channel open
+            } else {
+                sendResponse({ success: false, error: "DOM Agent not loaded." });
+            }
+        }
     });
 
     // 5. Code Block listeners (for Dev mode)
@@ -75,6 +97,16 @@ let detectedPageType = "generic";
             }
         }
     });
+
+    // 8. Expose DOMAgent for testing (User Request)
+    try {
+        const src = chrome.runtime.getURL("content/dom-agent.js");
+        const { DOMAgent } = await import(src);
+        window.domAgent = new DOMAgent();
+        console.log("Sidebar: DOMAgent loaded and available as window.domAgent");
+    } catch (e) {
+        console.error("Sidebar: Failed to load DOMAgent", e);
+    }
 
 })();
 

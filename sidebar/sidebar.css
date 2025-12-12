@@ -84,8 +84,12 @@ body {
 /* Main Content */
 .content {
   flex: 1;
-  overflow-y: auto;
-  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  overflow-y: hidden;
+  /* Disable global scroll, delegate to tabs */
+  padding: 0;
+  /* Padding moved to tabs for better control */
 }
 
 /* Loading */
@@ -94,7 +98,8 @@ body {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  height: 50%;
+  flex: 1;
+  /* Take available space */
   color: #888;
 }
 
@@ -230,10 +235,20 @@ body {
 
 .tab-content {
   display: none;
+  flex: 1;
+  flex-direction: column;
+  overflow-y: auto;
+  /* Default scroll for tabs */
+  padding: 16px;
 }
 
 .tab-content.active {
-  display: block;
+  display: flex;
+}
+
+/* Chat Overrides: Don't scroll the container, scroll the history */
+#tab-chat.tab-content {
+  overflow-y: hidden;
 }
 
 /* Chat */
@@ -241,7 +256,11 @@ body {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  min-height: 100px;
+  flex: 1;
+  /* Grow to fill space */
+  overflow-y: auto;
+  /* Scrollable history */
+  padding-bottom: 10px;
 }
 
 .chat-msg {
@@ -314,6 +333,92 @@ input[type="text"]:focus {
   font-size: 12px;
   overflow-x: auto;
   margin-top: 10px;
+}
+
+/* Markdown Styling */
+.result-box pre,
+.chat-msg pre {
+  background: #f4f4f4;
+  padding: 10px;
+  border-radius: 6px;
+  overflow-x: auto;
+  font-size: 0.9em;
+  margin: 8px 0;
+}
+
+.result-box code,
+.chat-msg code {
+  font-family: 'Consolas', 'Monaco', monospace;
+  background: rgba(0, 0, 0, 0.05);
+  padding: 2px 4px;
+  border-radius: 4px;
+}
+
+.result-box pre code,
+.chat-msg pre code {
+  background: transparent;
+  padding: 0;
+  color: #333;
+}
+
+.chat-msg.assistant pre {
+  background: #e9ecef;
+  /* Slightly darker for assistant bubble */
+}
+
+/* Ensure lists don't look weird */
+.result-box ul,
+.result-box ol,
+.chat-msg ul,
+.chat-msg ol {
+  padding-left: 20px;
+  margin: 5px 0;
+}
+
+.result-box p,
+.chat-msg p {
+  margin-bottom: 8px;
+}
+
+.result-box p:last-child,
+.chat-msg p:last-child {
+  margin-bottom: 0;
+}
+
+/* Links in Markdown */
+.result-box a,
+.chat-msg a {
+  color: var(--accent-color);
+  text-decoration: none;
+}
+
+.result-box a:hover,
+.chat-msg a:hover {
+  text-decoration: underline;
+}
+
+/* Tables in Markdown */
+.result-box table,
+.chat-msg table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 10px 0;
+  font-size: 13px;
+}
+
+.result-box th,
+.chat-msg th,
+.result-box td,
+.chat-msg td {
+  border: 1px solid var(--border-color);
+  padding: 6px;
+  text-align: left;
+}
+
+.result-box th,
+.chat-msg th {
+  background: var(--secondary-bg);
+  font-weight: 600;
 }
 
 /* Chat Container in Tabs */

@@ -53,6 +53,8 @@
                 "sidebar/sidebar.html",
                 "sidebar/sidebar.css",
                 "sidebar/sidebar.js",
+                "sidebar/marked.min.js",
+                "content/dom-agent.js",
                 "utils/page-detector.js",
                 "assets/*"
             ],
