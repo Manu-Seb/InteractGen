@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Sidebar</title>
+  <link rel="stylesheet" href="sidebar.css">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Header -->
+    <header class="header">
+      <div class="header-left">
+        <div class="logo-icon">AI</div>
+        <span id="page-type-badge" class="badge">Generic</span>
+      </div>
+      <div class="header-right">
+        <button id="minimize-btn" title="Minimize">–</button>
+        <button id="close-btn" title="Close">×</button>
+      </div>
+    </header>
+
+    <!-- Content Area -->
+    <main id="main-content" class="content">
+      <!-- Dynamic content injected here by sidebar.js -->
+      <div class="loading-state">
+        <div class="spinner"></div>
+        <p>Analyzing context...</p>
+      </div>
+    </main>
+
+    <!-- Footer / Chat Input (visible in some modes) -->
+    <footer id="footer-input" class="hidden">
+      <input type="text" id="user-input" placeholder="Ask something..." />
+      <button id="send-btn">➤</button>
+    </footer>
+  </div>
+
+  <!-- Templates for different states to clone from -->
+  <template id="template-blog">
+    <div class="section">
+      <h3>📄 Article Assistant</h3>
+      <div class="card action-card" data-action="summarize">
+        <div class="card-icon">📝</div>
+        <div class="card-text">Summarize this article</div>
+      </div>
+      <div class="options-row">
+        <button class="small-btn" data-action="keypoints">Key Points</button>
+        <button class="small-btn" data-action="tldr">TL;DR</button>
+      </div>
+      <div id="result-area" class="result-box hidden"></div>
+    </div>
+  </template>
+
+  <template id="template-marketplace">
+    <div class="section">
+      <h3>🛍️ Shopping Assistant</h3>
+      <div class="card action-card" data-action="compare">
+        <div class="card-icon">⚖️</div>
+        <div class="card-text">Compare prices</div>
+      </div>
+      <div class="card action-card" data-action="similar">
+        <div class="card-icon">🔍</div>
+        <div class="card-text">Find similar items</div>
+      </div>
+      <div class="result-box hidden" id="shopping-results"></div>
+    </div>
+  </template>
+
+  <template id="template-dev">
+    <div class="section">
+      <h3>💻 Code Assistant</h3>
+      <p class="hint-text">Select a code block on the page or choose an option:</p>
+      <div class="card action-card" data-action="explain">
+        <div class="card-icon">🤔</div>
+        <div class="card-text">Explain code</div>
+      </div>
+      <div class="card action-card" data-action="bugs">
+        <div class="card-icon">🐛</div>
+        <div class="card-text">Find bugs</div>
+      </div>
+      <div id="code-preview" class="code-block hidden"></div>
+      <div id="analysis-result" class="result-box hidden"></div>
+    </div>
+  </template>
+
+  <template id="template-generic">
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="chat">Chat</button>
+      <button class="tab-btn" data-tab="reminders">Reminders</button>
+      <button class="tab-btn" data-tab="research">Research</button>
+    </div>
+    
+    <div id="tab-chat" class="tab-content active">
+      <div id="chat-history" class="chat-history"></div>
+    </div>
+
+    <div id="tab-reminders" class="tab-content">
+      <div class="quick-actions">
+        <button class="pill-btn" data-time="3600">+1 Hr</button>
+        <button class="pill-btn" data-time="86400">Tmrw</button>
+      </div>
+      <ul id="reminder-list" class="list-group"></ul>
+    </div>
+
+    <div id="tab-research" class="tab-content">
+      <button class="primary-btn full-width" id="add-session-btn">+ Add Page to Session</button>
+      <div id="research-list" class="list-group"></div>
+      <button class="secondary-btn full-width" id="generate-notes-btn">Generate Notes</button>
+    </div>
+  </template>
+
+  <script type="module" src="sidebar.js"></script>
+</body>
+</html>

@@ -1,0 +1,21 @@
+/* content.css */
+/* Minimal styles, mostly logic is in shadow DOM */
+/* If we need to highlight things on the page (like code blocks) */
+
+.ai-code-highlight {
+    outline: 2px solid #6366f1;
+    cursor: pointer;
+    position: relative;
+}
+
+.ai-code-highlight::after {
+    content: "Analyze";
+    position: absolute;
+    top: -20px;
+    right: 0;
+    background: #6366f1;
+    color: white;
+    font-size: 10px;
+    padding: 2px 5px;
+    border-radius: 4px;
+}

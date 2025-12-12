@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Options</title>
+    <style>
+        body {
+            max-width: 600px;
+            margin: 40px auto;
+            font-family: sans-serif;
+            line-height: 1.6;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 10px;
+        }
+
+        h1 {
+            border-bottom: 1px solid #ccc;
+            padding-bottom: 10px;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>AI Assistant Settings</h1>
+
+    <div id="settings-area">
+        <label>
+            <input type="checkbox" id="enableSidebar" checked> Enable Floating Button
+        </label>
+        <label>
+            <input type="checkbox" id="enableBlog" checked> Enable Blog Summaries
+        </label>
+        <label>
+            <input type="checkbox" id="enableMarketplace" checked> Enable Shopping Assistant
+        </label>
+    </div>
+
+    <button id="save">Save Settings</button>
+    <div id="status"></div>
+
+    <script src="options.js"></script>
+</body>
+
+</html>
