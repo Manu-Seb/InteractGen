@@ -69,7 +69,10 @@ async function handleAIRequest(msg) {
             text = "💡 Code Explanation:\nThis function uses a heuristics-based approach to classify the current DOM. It checks for specific store indicators (meta tags) and developer site hostnames to determine the `pageType` string.";
             break;
         case "REQUEST_CODE_DEBUG":
-            text = "🐛 Potential Bug:\nThe regex used for URL validation might miss edge cases with international domains. Consider using the `URL` API instead of string parsing.";
+            text = "🐛 Potential Bug:\nThe regex used for creating URL validation might miss edge cases with international domains. Consider using the `URL` API instead of string parsing.";
+            break;
+        case "REQUEST_SIMILAR_COURSES": // Online Course
+            text = "📚 Similar Courses:\n1. Python for Everybody (Coursera)\n2. Machine Learning by Andrew Ng (Coursera)\n3. Complete Python Bootcamp (Udemy)\n4. Intro to Computer Science (Udacity)\n\nRecommendation: 'Python for Everybody' is a great starting point.";
             break;
         default:
             text = "Processed request: " + msg.action;

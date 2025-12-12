@@ -50,7 +50,7 @@ function updateUI() {
 
     // Load template
     let templateId = "template-generic";
-    if (["blog", "marketplace", "dev"].includes(currentPageType)) {
+    if (["blog", "marketplace", "dev", "online-course"].includes(currentPageType)) {
         templateId = `template-${currentPageType}`;
     }
 
@@ -137,7 +137,8 @@ function performAction(actionName) {
         'keypoints': 'REQUEST_KEYPOINTS',
         'compare': 'REQUEST_PRODUCT_COMPARISON',
         'explain': 'REQUEST_CODE_EXPLAIN',
-        'bugs': 'REQUEST_CODE_DEBUG'
+        'bugs': 'REQUEST_CODE_DEBUG',
+        'similar-courses': 'REQUEST_SIMILAR_COURSES'
     };
 
     const fullAction = actionMap[actionName] || actionName.toUpperCase();
