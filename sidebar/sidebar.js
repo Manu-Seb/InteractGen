@@ -14,10 +14,6 @@ document.addEventListener('DOMContentLoaded', () => {
             updateUI();
         } else if (message.action === "UPDATE_SIDEBAR_CONTENT") {
             handleContentUpdate(message.data);
-        } else if (message.action === "REMINDER_TRIGGERED") {
-            // Highlight reminders tab or show alert
-            alert(`Reminder: ${message.titletitle}`);
-            showTab("reminders");
         }
     });
 
@@ -55,10 +51,9 @@ function setupGlobalListeners() {
             return;
         }
 
-        // 4. Reminders
-        const pillBtn = e.target.closest('.pill-btn');
-        if (pillBtn) {
-            setReminder(parseInt(pillBtn.dataset.time));
+        // 4. Saved Pages
+        if (e.target.id === 'save-page-btn') {
+            saveCurrentPage();
             return;
         }
 
@@ -100,6 +95,7 @@ function updateUI() {
     if (currentPageType === "generic") {
         footer.classList.remove('hidden');
         loadChatHistory(); // Restore chat when generic template is loaded
+        loadSavedPages();
     } else {
         footer.classList.add('hidden');
     }
@@ -225,16 +221,44 @@ function addChatMessage(text, role, save = true) {
     }
 }
 
-// Reminders
-function setReminder(seconds) {
-    chrome.runtime.sendMessage({
-        action: "SET_REMINDER",
+// Saved Pages
+function saveCurrentPage() {
+    const pageData = {
         url: currentUrl,
-        title: document.title || "Page Reminder",
-        offsetSeconds: seconds
-    }, () => {
-        alert("Reminder set!");
-        // Refresh list logic would go here
+        title: document.title || currentUrl, // Ideally passed from content script, but URL works for now
+        timestamp: Date.now()
+    };
+
+    chrome.storage.local.get("savedPages", (data) => {
+        const list = data.savedPages || [];
+        // Check duplicate
+        if (!list.some(p => p.url === currentUrl)) {
+            list.push(pageData);
+            chrome.storage.local.set({ savedPages: list }, () => {
+                loadSavedPages(); // Refresh UI
+                alert("Page saved!");
+            });
+        } else {
+            alert("Page already saved.");
+        }
+    });
+}
+
+function loadSavedPages() {
+    chrome.storage.local.get("savedPages", (data) => {
+        const list = data.savedPages || [];
+        const ul = document.getElementById('saved-pages-list');
+        if (!ul) return;
+
+        ul.innerHTML = "";
+        list.forEach(page => {
+            const li = document.createElement('li');
+            li.className = "list-item"; // Reuse existing styles if possible or generic
+            li.style.padding = "8px";
+            li.style.borderBottom = "1px solid #eee";
+            li.innerHTML = `<a href="${page.url}" target="_blank" style="text-decoration:none; color:black; font-weight:500;">${new URL(page.url).hostname}</a><br><small>${new Date(page.timestamp).toLocaleDateString()}</small>`;
+            ul.appendChild(li);
+        });
     });
 }
 
