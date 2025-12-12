@@ -27,10 +27,47 @@ document.addEventListener('DOMContentLoaded', () => {
 
 function setupGlobalListeners() {
     document.getElementById('close-btn').addEventListener('click', () => {
-        // Send message to content script to hide iframe
-        window.parent.postMessage({ action: "CLOSE_SIDEBAR" }, "*");
+        // Send message to background to forward to content script
+        chrome.runtime.sendMessage({ action: "CLOSE_SIDEBAR" });
     });
 
+
+    // Event Delegation for Dynamic Content
+    document.getElementById('main-content').addEventListener('click', (e) => {
+        // 1. Tabs
+        const tabBtn = e.target.closest('.tab-btn');
+        if (tabBtn) {
+            showTab(tabBtn.dataset.tab);
+            return;
+        }
+
+        // 2. Action Cards
+        const actionCard = e.target.closest('.action-card');
+        if (actionCard) {
+            performAction(actionCard.dataset.action);
+            return;
+        }
+
+        // 3. Small Buttons / Options
+        const smallBtn = e.target.closest('.small-btn');
+        if (smallBtn) {
+            performAction(smallBtn.dataset.action);
+            return;
+        }
+
+        // 4. Reminders
+        const pillBtn = e.target.closest('.pill-btn');
+        if (pillBtn) {
+            setReminder(parseInt(pillBtn.dataset.time));
+            return;
+        }
+
+        // 5. Research - Add Session
+        if (e.target.id === 'add-session-btn') {
+            addToResearchSession();
+            return;
+        }
+    });
 
     document.getElementById('send-btn').addEventListener('click', sendChatMessage);
     document.getElementById('user-input').addEventListener('keypress', (e) => {
@@ -55,7 +92,7 @@ function updateUI() {
     if (template) {
         const clone = template.content.cloneNode(true);
         main.appendChild(clone);
-        attachDynamicListeners(main);
+        // Note: Event delegation in setupGlobalListeners handles clicks now
     }
 
     // Toggle footer
@@ -64,43 +101,6 @@ function updateUI() {
         footer.classList.remove('hidden');
     } else {
         footer.classList.add('hidden');
-    }
-}
-
-function attachDynamicListeners(container) {
-    // Action Cards
-    container.querySelectorAll('.action-card').forEach(card => {
-        card.addEventListener('click', () => {
-            const action = card.dataset.action;
-            performAction(action);
-        });
-    });
-
-    // Tabs
-    container.querySelectorAll('.tab-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-            showTab(btn.dataset.tab);
-        });
-    });
-
-    // Small buttons (options)
-    container.querySelectorAll('.small-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-            performAction(btn.dataset.action);
-        });
-    });
-
-    // Reminders
-    container.querySelectorAll('.pill-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-            setReminder(parseInt(btn.dataset.time));
-        });
-    });
-
-    // Research
-    const addSessionBtn = container.querySelector('#add-session-btn');
-    if (addSessionBtn) {
-        addSessionBtn.addEventListener('click', addToResearchSession);
     }
 }
 

@@ -46,6 +46,9 @@ let detectedPageType = "generic";
         if (msg.action === "TOGGLE_SIDEBAR") { // From context menu or shortcut
             toggleSidebar(!sidebarOpen);
         }
+        if (msg.action === "CLOSE_SIDEBAR") {
+            toggleSidebar(false);
+        }
         if (msg.action === "ANALYZE_REQUEST") {
             // Example: User clicked "Analyze with AI" in context menu
             toggleSidebar(true);
@@ -58,6 +61,13 @@ let detectedPageType = "generic";
     if (detectedPageType === "dev") {
         setupCodeInteractions();
     }
+
+    // 6. Auto-close when switching tabs
+    document.addEventListener("visibilitychange", () => {
+        if (document.hidden && sidebarOpen) {
+            toggleSidebar(false);
+        }
+    });
 })();
 
 function injectSidebar() {
@@ -67,9 +77,10 @@ function injectSidebar() {
     shadowHost.style.position = "fixed";
     shadowHost.style.zIndex = "2147483647"; // Max z-index
     shadowHost.style.top = "0";
-    shadowHost.style.right = "0";
-    shadowHost.style.height = "0"; // Initially 0 height to not block clicks
-    shadowHost.style.width = "0";
+    shadowHost.style.left = "0"; // Ensure coverage
+    shadowHost.style.width = "100vw";
+    shadowHost.style.height = "100vh";
+    shadowHost.style.pointerEvents = "none"; // Let clicks pass through by default
     document.body.appendChild(shadowHost);
 
     shadowRoot = shadowHost.attachShadow({ mode: 'open' });
@@ -89,6 +100,7 @@ function injectSidebar() {
             transition: right 0.3s ease-in-out;
             z-index: 2147483647;
             display: block;
+            pointer-events: auto; /* Capture clicks inside sidebar */
         }
         .sidebar-iframe.open {
             right: 0;
@@ -111,6 +123,7 @@ function injectSidebar() {
             align-items: center;
             justify-content: center;
             transition: transform 0.2s;
+            pointer-events: auto; /* Capture clicks on button */
         }
         .toggle-btn:hover {
             transform: scale(1.1);
@@ -137,17 +150,8 @@ function toggleSidebar(open) {
     sidebarOpen = open;
     if (open) {
         sidebarIframe.classList.add('open');
-        shadowHost.style.width = "100vw"; // Expand host to allow clicking sidebar
-        shadowHost.style.height = "100vh";
-        shadowHost.style.pointerEvents = "none"; // Let clicks pass through empty areas?
-        // Actually, we need pointer events on the iframe and button, but not the rest of the screen unless we have a backdrop.
-        // Shadow DOM style isolation makes this tricky. 
-        // Better: Set host size to full only so children can be positioned relative to viewport properly.
-        // We handle pointer-events on children in CSS? 
-        // No, if host is 0x0, children outside it are visible but might have interaction issues depending on browser.
-        // Safest: Host always 0x0 size, but allow overflow.
-        shadowHost.style.width = "0";
-        shadowHost.style.height = "0";
+        // Shadow Host is already full width/height with pointer-events: none
+        // Iframe has pointer-events: auto, so it handles interaction.
 
         // Initialize sidebar state
         sendToSidebar({

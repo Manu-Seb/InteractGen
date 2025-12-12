@@ -43,7 +43,17 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         return true;
     }
 
-    // 5. Sidebar Control (optional relay)
+    // 5. Sidebar Control
+    if (message.action === "CLOSE_SIDEBAR") {
+        chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+            if (tabs[0]) {
+                chrome.tabs.sendMessage(tabs[0].id, { action: "CLOSE_SIDEBAR" });
+            }
+        });
+        return true;
+    }
+
+    // 6. Generic Relay
     // If content script sends INIT_SIDEBAR, it might just be for logging or tracking active tab state
 });
 
