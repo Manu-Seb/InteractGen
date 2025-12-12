@@ -79,3 +79,7 @@ Within the `generic` route, there is a sub-router using simple CSS tabs:
 *   **Research**
 
 This is handled by the `showTab(tabName)` function in `sidebar.js`, which simply toggles `.active` classes on standard HTML elements.
+
+## See Also
+*   [System Architecture](./ARCHITECTURE.md)
+*   [Development Guide](./DEVELOPMENT.md)
