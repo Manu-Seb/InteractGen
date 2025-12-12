@@ -1,51 +1,61 @@
 {
-  "manifest_version": 3,
-  "name": "Context-Aware AI Sidebar",
-  "version": "1.0.0",
-  "description": "A Loom-style sidebar assistant that adapts to the content of the page.",
-  "permissions": [
-    "storage",
-    "tabs",
-    "activeTab",
-    "scripting",
-    "alarms",
-    "notifications"
-  ],
-  "host_permissions": [
-    "<all_urls>"
-  ],
-  "background": {
-    "service_worker": "background/service-worker.js"
-  },
-  "content_scripts": [
-    {
-      "matches": ["<all_urls>"],
-      "js": ["content/content.js"],
-      "css": ["content/content.css"],
-      "run_at": "document_idle"
-    }
-  ],
-  "action": {
-    "default_popup": "popup/popup.html",
-    "default_icon": {
-      "16": "assets/icon16.png",
-      "48": "assets/icon48.png",
-      "128": "assets/icon128.png"
-    }
-  },
-  "options_ui": {
-    "page": "options/options.html",
-    "open_in_tab": true
-  },
-  "web_accessible_resources": [
-    {
-      "resources": [
-        "sidebar/sidebar.html",
-        "sidebar/sidebar.css",
-        "sidebar/sidebar.js",
-        "assets/*"
-      ],
-      "matches": ["<all_urls>"]
-    }
-  ]
+    "manifest_version": 3,
+    "name": "Context-Aware AI Sidebar",
+    "version": "1.0.0",
+    "description": "A Loom-style sidebar assistant that adapts to the content of the page.",
+    "permissions": [
+        "storage",
+        "tabs",
+        "activeTab",
+        "scripting",
+        "alarms",
+        "notifications"
+    ],
+    "host_permissions": [
+        "<all_urls>"
+    ],
+    "background": {
+        "service_worker": "background/service-worker.js"
+    },
+    "content_scripts": [
+        {
+            "matches": [
+                "<all_urls>"
+            ],
+            "js": [
+                "utils/page-detector.js",
+                "content/content.js"
+            ],
+            "css": [
+                "content/content.css"
+            ],
+            "run_at": "document_idle"
+        }
+    ],
+    "action": {
+        "default_popup": "popup/popup.html",
+        "default_icon": {
+            "16": "assets/icon16.png",
+            "48": "assets/icon48.png",
+            "128": "assets/icon128.png"
+        }
+    },
+    "options_ui": {
+        "page": "options/options.html",
+        "open_in_tab": true
+    },
+    "web_accessible_resources": [
+        {
+            "resources": [
+                "sidebar/sidebar.html",
+                "sidebar/sidebar.css",
+                "sidebar/sidebar.js",
+                "utils/page-detector.js",
+                "assets/*"
+            ],
+            "matches": [
+                "<all_urls>"
+            ]
+        }
+    ]
 }

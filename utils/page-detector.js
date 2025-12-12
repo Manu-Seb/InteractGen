@@ -1,7 +1,7 @@
 // Utility to detect page type based on URL and content heuristics
 // Returns: "blog" | "marketplace" | "dev" | "generic"
 
-export function detectPageType(document) {
+function detectPageType(document) {
   const url = window.location.href;
   const hostname = window.location.hostname;
   const bodyText = document.body.innerText.toLowerCase();
@@ -46,7 +46,7 @@ export function detectPageType(document) {
 }
 
 // Format a timestamp for display
-export function formatTime(ms) {
+function formatTime(ms) {
   if (!ms) return "";
   return new Date(ms).toLocaleString();
 }

@@ -15,12 +15,15 @@ let detectedPageType = "generic";
 (async function init() {
     // 1. Detect Page Type
     try {
-        const src = chrome.runtime.getURL('utils/page-detector.js');
-        const { detectPageType } = await import(src);
-        detectedPageType = detectPageType(document);
-        console.log("Extension detected page type:", detectedPageType);
+        // Now loaded via manifest content_scripts, so function is global
+        if (typeof detectPageType === 'function') {
+            detectedPageType = detectPageType(document);
+            console.log("Extension detected page type:", detectedPageType);
+        } else {
+            console.warn("detectPageType function not found");
+        }
     } catch (e) {
-        console.error("Failed to load page detector:", e);
+        console.error("Failed to detect page type:", e);
     }
 
     // 2. Inject UI
