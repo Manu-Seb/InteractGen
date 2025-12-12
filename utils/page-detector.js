@@ -17,16 +17,26 @@ function detectPageType(document) {
     return "dev";
   }
 
-  // 2. Marketplace / Shopping
-  if (
-    hostname.includes("amazon") ||
-    hostname.includes("ebay") ||
-    hostname.includes("shopify") ||
+  // 2. Marketplace / Shopping (Product Pages Only)
+  // We want to distinguish actual product pages from homepages or search results.
+  // Homepages of Amazon/eBay etc. should fall back to "generic".
+
+  const hasProductSignals = (
     document.querySelector("meta[property='og:price:amount']") ||
-    document.querySelector(".product-price") ||
+    document.querySelector("meta[property='product:price:amount']") ||
     document.querySelector("#addToCart") ||
-    document.querySelector(".add-to-cart")
-  ) {
+    document.querySelector(".add-to-cart") ||
+    document.querySelector("[id*='addToCart']") ||
+    document.querySelector("[class*='product-price']")
+  );
+
+  const isMajorSiteProductUrl = (
+    (hostname.includes("amazon") && url.includes("/dp/")) ||
+    (hostname.includes("ebay") && url.includes("/itm/")) ||
+    (hostname.includes("etsy") && url.includes("/listing/"))
+  );
+
+  if (hasProductSignals || isMajorSiteProductUrl) {
     return "marketplace";
   }
 
