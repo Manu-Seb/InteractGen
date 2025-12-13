@@ -23,8 +23,9 @@ chrome.runtime.onInstalled.addListener(() => {
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     // 1. AI Actions
     // 1. AI Actions
+    // 1. AI Actions
     if (message.action.startsWith("REQUEST_")) {
-        handleAIRequest(message)
+        handleAIRequest(message, sender)
             .then(response => sendResponse(response))
             .catch(error => sendResponse({ data: "Error: " + error.message }));
         return true; // async response
@@ -32,7 +33,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
     // 2. Chat
     if (message.action === "SEND_CHAT") {
-        handleChat(message).then(response => sendResponse(response));
+        handleChat(message, sender).then(response => sendResponse(response));
         return true;
     }
 
@@ -64,7 +65,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
 // ---- Core Logic Stubs ----
 
-async function handleAIRequest(msg) {
+async function handleAIRequest(msg, sender) {
     // No delay
 
     let responseData = "";
@@ -202,96 +203,15 @@ async function handleAIRequest(msg) {
                 const explainRes = await generateGeminiReply("You are a senior developer.", explainPrompt, { url: msg.url, pageType: msg.pageType });
                 responseData = explainRes.reply || explainRes.error;
                 break;
-            case "SEND_CHAT":
-                console.log("Service Worker: Chat Message Received:", msg.message);
-                // 1. Intent Analysis
-                analyzeMessage(msg.message, GEMINI_API_KEY)
-                    .then(async (intent) => {
-                        console.log("Service Worker: Intent:", intent);
-
-                        if (intent.type === "TASK") {
-                            // --- TASK EXECUTION ---
-                            console.log("Service Worker: Routing to DOM Agent...");
-                            try {
-                                let tabId = sender.tab?.id;
-                                if (!tabId) {
-                                    const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
-                                    tabId = tabs[0]?.id;
-                                }
-
-                                if (tabId) {
-                                    const goal = intent.payload?.goal || msg.message;
-                                    const agentRes = await chrome.tabs.sendMessage(tabId, {
-                                        action: "EXECUTE_AGENT_TASK",
-                                        goal: goal
-                                    });
-
-                                    let replyText = "";
-                                    if (agentRes && agentRes.success) {
-                                        if (agentRes.result && agentRes.result.history && agentRes.result.history.length > 0) {
-                                            replyText = "✅ **Task Complete**\n\nActions taken:\n" +
-                                                agentRes.result.history.map(h => `- ${h.action} on ${h.selector}`).join('\n');
-                                        } else {
-                                            replyText = "✅ **Task Complete** (No visible actions recorded)";
-                                        }
-                                    } else {
-                                        replyText = "⚠️ **Task Failed**\n\n" + (agentRes?.error || "Unknown error");
-                                    }
-                                    sendResponse({ reply: replyText });
-                                } else {
-                                    throw new Error("No active tab found for agent.");
-                                }
-                            } catch (e) {
-                                console.error("Agent Execution Error:", e);
-                                sendResponse({ reply: "I tried to run the agent but encountered an error: " + e.message });
-                            }
-
-                        } else if (intent.type === "DATA_SAVE") {
-                            // --- DATA SAVING ---
-                            const { key, value } = intent.payload || {};
-                            if (key && value) {
-                                try {
-                                    // Fetch existing
-                                    const data = await chrome.storage.sync.get("userProfileData");
-                                    const profile = data.userProfileData || {};
-
-                                    // Update
-                                    profile[key] = value;
-
-                                    // Save back
-                                    await chrome.storage.sync.set({ userProfileData: profile });
-                                    sendResponse({ reply: `✅ Saved **${key}** as "${value}".` });
-                                } catch (e) {
-                                    sendResponse({ reply: "❌ Failed to save data: " + e.message });
-                                }
-                            } else {
-                                sendResponse({ reply: "I understood you want to save data, but I couldn't extract the details. Please try 'My email is...'" });
-                            }
-
-                        } else {
-                            // --- NORMAL CHAT ---
-                            const chatSystemInstruction = "You are a helpful AI assistant in a browser sidebar. Concise answers.";
-                            const chatRes = await generateGeminiReply(chatSystemInstruction, msg.message, { ...msg.context }, sender.tab?.id);
-                            sendResponse({ reply: chatRes.reply || chatRes.error });
-                        }
-                    })
-                    .catch(err => {
-                        console.error("Intent Detection Error:", err);
-                        // Fallback
-                        generateGeminiReply("You are a helpful assistant.", msg.message, { ...msg.context }, sender.tab?.id)
-                            .then(r => sendResponse({ reply: r.reply }))
-                            .catch(e => sendResponse({ error: e.message }));
-                    });
-                return true; // Async
+            // case "SEND_CHAT": Removed (moved to handleChat)
 
             case "REQUEST_AGENT_PLAN":
                 console.log("Service Worker: Agent Planning...");
                 const agentPrompt = msg.prompt;
-                // We use the raw prompt directly
-                generateGeminiReply(agentPrompt, [], "", sender.tab?.id)
-                    .then(reply => sendResponse({ data: reply }))
-                    .catch(err => sendResponse({ error: err.message }));
-                return true; // Async response
+                // Use skipContext because the prompt itself contains all necessary details
+                const planResult = await generateGeminiReply("You are a browser automation agent.", agentPrompt, { skipContext: true });
+                responseData = planResult.reply || planResult.error;
+                break;
 
             case "REQUEST_DOCS": // Dev - Find Docs
                 console.log("Service Worker: Finding Docs (AI Search)...");
@@ -314,18 +234,25 @@ async function handleAIRequest(msg) {
                 break;
             case "REQUEST_SIMILAR_COURSES": // Online Course
                 console.log("Service Worker: Finding Similar Courses...");
-                const courseUrl = msg.url;
-                const coursePrompt = `I am looking at this course: ${courseUrl}
+                const courseTitle = msg.payload?.title || "Unknown Course";
+                const coursePrompt = `I am currently viewing an online course titled "${courseTitle}" at ${msg.url}.
                 
-                Suggest 3-5 similar or alternative courses from other platforms (Coursera, Udemy, edX, etc.).
-                For each, mention:
-                - Course Name
-                - Platform
-                - Key Differentiator
+                Please recommend 3-5 similar or alternative online courses from reputable platforms (like Coursera, Udemy, edX, or Udacity).
                 
-                Provide a direct link if possible.`;
+                CRITICAL INSTRUCTION:
+                - Provide **REAL, SPECIFIC course titles** exactly as they appear on the platform.
+                - **DO NOT** give generic topic names like "Python Object Oriented Programming Course on Udemy".
+                - **BAD Example**: "Java Course by Coursera"
+                - **GOOD Example**: "Java Programming and Software Engineering Fundamentals Specialization"
+                
+                For each recommendation, provide:
+                1. **Specific Course Name** followed immediately by a Google Search link for that course using a magnifying glass emoji 🔍. Example: **Exact Course Title** [🔍](https://www.google.com/search?q=Exact+Course+Title+Platform)
+                2. **Platform**
+                3. **Brief Reason** why it's a good alternative.
+                
+                Format as a clean markdown list.`;
 
-                const courseRes = await generateGeminiReply("You are an education advisor.", coursePrompt, { url: msg.url, pageType: msg.pageType, useGrounding: true });
+                const courseRes = await generateGeminiReply("You are a helpful education assistant. Use your knowledge to find similar courses.", coursePrompt, { url: msg.url, pageType: msg.pageType, useGrounding: true });
                 responseData = courseRes.reply || courseRes.error;
                 break;
             default:
@@ -339,17 +266,140 @@ async function handleAIRequest(msg) {
     return { data: responseData };
 }
 
-async function handleChat(msg) {
-    // Minimalistic system instruction
-    const systemPrompt = "You are a helpful browser assistant. If the user asks to fill a form or do a task, tell them 'I can do that! Just ask me to 'fill this form'.'. Do NOT suggest external tools like RoboForm. You ARE the automation tool.";
+async function handleChat(msg, sender) {
+    console.log("Service Worker: Chat Message Received:", msg.message);
 
-    const result = await generateGeminiReply(systemPrompt, msg.message, msg.context);
+    // 1. Intent Analysis
+    try {
+        const intent = await analyzeMessage(msg.message, GEMINI_API_KEY);
+        console.log("Service Worker: Intent:", intent);
 
-    if (result.error) {
-        return { reply: result.error };
-    }
+        if (intent.type === "TASK") {
+            // --- TASK EXECUTION ---
+            console.log("Service Worker: Routing to DOM Agent...");
+            try {
+                let tabId = sender.tab?.id;
+                if (!tabId) {
+                    const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+                    tabId = tabs[0]?.id;
+                }
 
-    return { reply: result.reply };
+                if (tabId) {
+                    const goal = intent.payload?.goal || msg.message;
+                    const agentRes = await chrome.tabs.sendMessage(tabId, {
+                        action: "EXECUTE_AGENT_TASK",
+                        goal: goal
+                    });
+
+                    let replyText = "";
+                    if (agentRes && agentRes.success) {
+                        if (agentRes.result && agentRes.result.history && agentRes.result.history.length > 0) {
+                            replyText = "✅ **Task Complete**\n\nActions taken:\n" +
+                                agentRes.result.history.map(h => `- ${h.action} on ${h.selector}`).join('\n');
+                        } else {
+                            replyText = "✅ **Task Complete** (No visible actions recorded)";
+                        }
+                    } else {
+                        replyText = "⚠️ **Task Failed**\n\n" + (agentRes?.error || "Unknown error");
+                    }
+                    return { reply: replyText };
+                } else {
+                    throw new Error("No active tab found for agent.");
+                }
+            } catch (e) {
+                console.error("Agent Execution Error:", e);
+                return { reply: "I tried to run the agent but encountered an error: " + e.message };
+            }
+
+        } else if (intent.type === "DATA_SAVE") {
+            // --- DATA SAVING ---
+            const { key, value } = intent.payload || {};
+            if (key && value) {
+                try {
+                    // Fetch existing
+                    const data = await chrome.storage.sync.get("userProfileData");
+                    const profile = data.userProfileData || {};
+
+                    // Update
+                    profile[key] = value;
+
+                    // Save back
+                    await chrome.storage.sync.set({ userProfileData: profile });
+                    return { reply: `✅ Saved **${key}** as "${value}".` };
+                } catch (e) {
+                    return { reply: "❌ Failed to save data: " + e.message };
+                }
+            } else {
+                return { reply: "I understood you want to save data, but I couldn't extract the details. Please try 'My email is...'" };
+            }
+
+        } else {
+            // --- NORMAL CHAT ---
+            const chatSystemInstruction = "You are a helpful AI assistant in a browser sidebar. Concise answers.";
+            const chatRes = await generateGeminiReply(chatSystemInstruction, msg.message, { ...msg.context }, sender.tab?.id);
+            sendResponse({ reply: chatRes.reply || chatRes.error });
+        }
+    })
+                    .catch (err => {
+        console.error("Intent Detection Error:", err);
+        // Fallback
+        generateGeminiReply("You are a helpful assistant.", msg.message, { ...msg.context }, sender.tab?.id)
+            .then(r => sendResponse({ reply: r.reply }))
+            .catch(e => sendResponse({ error: e.message }));
+    });
+    return true; // Async
+
+            case "REQUEST_AGENT_PLAN":
+    console.log("Service Worker: Agent Planning...");
+    const agentPrompt = msg.prompt;
+    // We use the raw prompt directly
+    generateGeminiReply(agentPrompt, [], "", sender.tab?.id)
+        .then(reply => sendResponse({ data: reply }))
+        .catch(err => sendResponse({ error: err.message }));
+    return true; // Async response
+
+            case "REQUEST_DOCS": // Dev - Find Docs
+    console.log("Service Worker: Finding Docs (AI Search)...");
+    const codeForDocs = msg.payload?.code || "No code provided.";
+
+    const docsPrompt = `You are a technical documentation expert. 
+                Analyze the following code snippet and identify EVERY specific function call, class, or method used from external libraries/frameworks.
+
+                1. **Function-Level Explanation**: For EACH function/method found (e.g., 'useEffect', 'axios.get', 'path.join'), explain exactly what it does *in the context of this code*.
+                2. **Deep Documentation Links**: Provide the direct, specific documentation link for that FUNCTION or method if available (not just the homepage).
+
+                Format the output as a clean list:
+                - **\`functionName\`** (Library): Explanation... [Link](...)
+                
+                Code Snippet:
+                ${codeForDocs.substring(0, 3000)}`;
+
+    const docsRes = await generateGeminiReply("You are a helpful developer assistant. Use Google Search to find specific function docs.", docsPrompt, { url: msg.url, pageType: msg.pageType, useGrounding: true });
+    responseData = docsRes.reply || docsRes.error;
+    break;
+            case "REQUEST_SIMILAR_COURSES": // Online Course
+    console.log("Service Worker: Finding Similar Courses...");
+    const courseUrl = msg.url;
+    const coursePrompt = `I am looking at this course: ${courseUrl}
+                
+                Suggest 3-5 similar or alternative courses from other platforms (Coursera, Udemy, edX, etc.).
+                For each, mention:
+                - Course Name
+                - Platform
+                - Key Differentiator
+                
+                Provide a direct link if possible.`;
+
+    const courseRes = await generateGeminiReply("You are an education advisor.", coursePrompt, { url: msg.url, pageType: msg.pageType, useGrounding: true });
+    responseData = courseRes.reply || courseRes.error;
+    break;
+            default:
+    responseData = "Processed request: " + msg.action;
+}
+    } catch (err) {
+    console.error("Intent/Chat Error:", err);
+    return { reply: "Error processing your request: " + err.message };
+}
 }
 
 async function analyzeMessage(userMessage, apiKeyOverride = null) {

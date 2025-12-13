@@ -270,6 +270,7 @@ async function toggleSidebar(open, forceRefresh = false) {
             action: "INIT_SIDEBAR",
             pageType: detectedPageType,
             url: window.location.href,
+            title: document.title, // Pass title for context
             productData: payload.productData,
             ...payload
         });
