@@ -218,6 +218,11 @@ export class DOMAgent {
         for (let i = 0; i < this.maxAttempts; i++) {
             // 1. Extract State
             const elements = this.extractInteractiveElements();
+            console.log(`DOMAgent: Found ${elements.length} interactive elements.`);
+
+            if (elements.length === 0) {
+                return { success: false, error: "No interactive elements found on page. (Is it a canvas or strict iframe?)" };
+            }
 
             // 2. Build Prompt
             const prompt = this.buildPrompt(userGoal, combinedData, elements);
@@ -225,11 +230,23 @@ export class DOMAgent {
             // 3. Call AI
             console.log("DOMAgent: Asking AI...");
             const response = await this.callGemini(prompt);
-            console.log("DOMAgent: AI Response", response);
 
-            if (!response || !response.actions) {
-                console.error("DOMAgent: Invalid response");
-                break;
+            if (!response) {
+                console.error("DOMAgent: No response from AI");
+                return { success: false, error: "AI failed to generate a plan." };
+            }
+
+            if (!response.actions || response.actions.length === 0) {
+                if (response.complete) {
+                    console.log("DOMAgent: AI says task is complete.");
+                    return { success: true, history: this.actionHistory };
+                }
+                console.warn("DOMAgent: AI returned no actions but not complete.");
+                // It might be stuck or needs more data.
+                // If we have history, maybe we are done?
+                if (this.actionHistory.length > 0) return { success: true, history: this.actionHistory };
+
+                return { success: false, error: "AI could not determine any actions. (Check if you have saved the necessary data in Settings)" };
             }
 
             // check completion
@@ -245,7 +262,6 @@ export class DOMAgent {
 
                 if (!result.success) {
                     console.warn("DOMAgent: Action failed", action, result.error);
-                    // Add failure to history so AI knows next time
                 }
 
                 await this.wait(500); // Pace actions
@@ -255,7 +271,7 @@ export class DOMAgent {
             await this.wait(1000);
         }
 
-        return { success: false, error: "Max attempts reached" };
+        return { success: false, error: "Max attempts reached without completion." };
     }
 
     async getPersistentUserData() {
@@ -307,29 +323,40 @@ Return ONLY valid JSON (no markdown):
 
     async callGemini(prompt) {
         return new Promise((resolve) => {
+            console.log("DOMAgent: Sending prompt to background...", prompt.substring(0, 100) + "...");
             chrome.runtime.sendMessage({
                 action: "REQUEST_AGENT_PLAN",
                 prompt: prompt
             }, (response) => {
                 if (chrome.runtime.lastError) {
-                    console.error(chrome.runtime.lastError);
+                    console.error("DOMAgent: Runtime Error:", chrome.runtime.lastError);
                     resolve(null);
                     return;
                 }
-                // Expecting response.data to be the JSON string or object
+
+                console.log("DOMAgent: Raw Background Response:", response);
+
+                // Expecting response.data to be the JSON string 
+                // In service-worker.js: sendResponse({ data: reply }) where reply is text
                 if (response && response.data) {
+                    // Extract text if it's an object with reply property (just in case)
+                    let jsonStr = typeof response.data === 'string' ? response.data : response.data.reply || JSON.stringify(response.data);
+
                     try {
                         // Cleanup if MD is returned
-                        let jsonStr = response.data;
                         if (jsonStr.includes('```json')) {
                             jsonStr = jsonStr.replace(/```json/g, '').replace(/```/g, '');
                         }
-                        resolve(JSON.parse(jsonStr));
+
+                        const parsed = JSON.parse(jsonStr);
+                        console.log("DOMAgent: Parsed Plan:", parsed);
+                        resolve(parsed);
                     } catch (e) {
-                        console.error("Failed to parse JSON", e);
+                        console.error("DOMAgent: Failed to parse JSON plan", e, jsonStr);
                         resolve(null);
                     }
                 } else {
+                    console.error("DOMAgent: Empty data in response");
                     resolve(null);
                 }
             });
