@@ -300,7 +300,21 @@ async function handleAIRequest(msg) {
                 responseData = docsRes.reply || docsRes.error;
                 break;
             case "REQUEST_SIMILAR_COURSES": // Online Course
-                responseData = "📚 Similar Courses:\n1. Python for Everybody (Coursera)\n2. Machine Learning by Andrew Ng (Coursera)\n3. Complete Python Bootcamp (Udemy)\n4. Intro to Computer Science (Udacity)\n\nRecommendation: 'Python for Everybody' is a great starting point.";
+                console.log("Service Worker: Finding Similar Courses...");
+                const courseTitle = msg.payload?.title || "Unknown Course";
+                const coursePrompt = `I am currently viewing an online course titled "${courseTitle}" at ${msg.url}.
+                
+                Please recommend 3-5 similar or alternative online courses from reputable platforms (like Coursera, Udemy, edX, or Udacity).
+                
+                For each recommendation, provide:
+                1. **Course Name**
+                2. **Platform**
+                3. **Brief Reason** why it's a good alternative.
+                
+                Format as a clean markdown list.`;
+
+                const courseRes = await generateGeminiReply("You are a helpful education assistant. Use your knowledge to find similar courses.", coursePrompt, { url: msg.url, pageType: msg.pageType, useGrounding: true });
+                responseData = courseRes.reply || courseRes.error;
                 break;
             default:
                 responseData = "Processed request: " + msg.action;

@@ -3,6 +3,7 @@
 // State
 let currentPageType = "generic";
 let currentUrl = "";
+let currentTitle = "";
 let currentProductData = {};
 let currentCodeContent = "";
 
@@ -31,6 +32,7 @@ document.addEventListener('DOMContentLoaded', () => {
 function initializeSidebar(data) {
     currentPageType = data.pageType;
     currentUrl = data.url;
+    currentTitle = data.title || "";
     if (data.productData) currentProductData = data.productData;
 
     // Crucial: Set code content from initialization data
@@ -47,6 +49,17 @@ function initializeSidebar(data) {
     if (data.readmeContent) {
         performAction('summarize_readme', { readme: data.readmeContent });
     }
+}
+// ... (lines 52-166 omitted)
+const payload = { ...extraPayload };
+if (fullAction === 'REQUEST_SIMILAR_ITEMS') {
+    payload.product = currentProductData;
+}
+if (fullAction === 'REQUEST_SIMILAR_COURSES') {
+    payload.title = currentTitle;
+}
+if (['REQUEST_CODE_EXPLAIN', 'REQUEST_DOCS'].includes(fullAction)) {
+    payload.code = currentCodeContent || "No visible code found on page.";
 }
 
 function setupGlobalListeners() {
@@ -166,6 +179,9 @@ function performAction(actionName, extraPayload = {}) {
     const payload = { ...extraPayload };
     if (fullAction === 'REQUEST_SIMILAR_ITEMS') {
         payload.product = currentProductData;
+    }
+    if (fullAction === 'REQUEST_SIMILAR_COURSES') {
+        payload.title = currentTitle;
     }
     if (['REQUEST_CODE_EXPLAIN', 'REQUEST_DOCS'].includes(fullAction)) {
         payload.code = currentCodeContent || "No visible code found on page.";
