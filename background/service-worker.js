@@ -306,8 +306,14 @@ async function handleAIRequest(msg) {
                 
                 Please recommend 3-5 similar or alternative online courses from reputable platforms (like Coursera, Udemy, edX, or Udacity).
                 
+                CRITICAL INSTRUCTION:
+                - Provide **REAL, SPECIFIC course titles** exactly as they appear on the platform.
+                - **DO NOT** give generic topic names like "Python Object Oriented Programming Course on Udemy".
+                - **BAD Example**: "Java Course by Coursera"
+                - **GOOD Example**: "Java Programming and Software Engineering Fundamentals Specialization"
+                
                 For each recommendation, provide:
-                1. **Course Name**
+                1. **Specific Course Name** followed immediately by a Google Search link for that course using a magnifying glass emoji 🔍. Example: **Exact Course Title** [🔍](https://www.google.com/search?q=Exact+Course+Title+Platform)
                 2. **Platform**
                 3. **Brief Reason** why it's a good alternative.
                 

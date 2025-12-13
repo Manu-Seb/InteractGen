@@ -256,9 +256,20 @@ function handleContentUpdate(data) {
     boxes.forEach(box => {
         if (!box.classList.contains('hidden')) {
             // Use marked.parse to render Markdown
-            // Optional: Configure marked if needed, but defaults are usually fine
             try {
                 box.innerHTML = marked.parse(data);
+
+                // Force all links to open in new tab and style search icons
+                box.querySelectorAll('a').forEach(link => {
+                    link.target = "_blank";
+                    link.rel = "noopener noreferrer";
+
+                    if (link.textContent.trim() === "🔍") {
+                        link.classList.add("search-icon-btn");
+                        link.title = "Search on Google";
+                        // Optional: clear standard text decoration if handled by class
+                    }
+                });
             } catch (e) {
                 console.error("Markdown parsing error:", e);
                 box.textContent = data; // Fallback
