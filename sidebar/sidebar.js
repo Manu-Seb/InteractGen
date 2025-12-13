@@ -83,11 +83,7 @@ function setupGlobalListeners() {
             return;
         }
 
-        // 5. Research
-        if (e.target.id === 'add-session-btn') {
-            addToResearchSession();
-            return;
-        }
+
         // 6. External Links (Chat & Summaries)
         const link = e.target.closest('a');
         if (link && link.href) {
@@ -405,19 +401,4 @@ function deleteSavedPage(index) {
     });
 }
 
-// Research
-function addToResearchSession() {
-    chrome.runtime.sendMessage({
-        action: "ADD_TO_RESEARCH",
-        url: currentUrl,
-        title: document.title,
-        pageType: currentPageType
-    }, () => {
-        const list = document.getElementById('research-list');
-        const item = document.createElement('div');
-        item.style.padding = "8px";
-        item.style.borderBottom = "1px solid #eee";
-        item.textContent = "Added: " + currentUrl;
-        list.appendChild(item);
-    });
-}
+
