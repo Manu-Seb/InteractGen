@@ -255,7 +255,7 @@ async function toggleSidebar(open, forceRefresh = false) {
         // Extract Data based on Page Type
         let payload = {};
         if (detectedPageType === "marketplace") {
-            payload = extractProductData();
+            payload = { productData: extractProductData() };
         } else if (detectedPageType === "dev") {
             const readmeText = extractReadme();
             if (readmeText) payload.readmeContent = readmeText;

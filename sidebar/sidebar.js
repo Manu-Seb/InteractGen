@@ -88,6 +88,13 @@ function setupGlobalListeners() {
             addToResearchSession();
             return;
         }
+        // 6. External Links (Chat & Summaries)
+        const link = e.target.closest('a');
+        if (link && link.href) {
+            e.preventDefault();
+            window.open(link.href, '_blank');
+            return;
+        }
     });
 }
 
@@ -164,7 +171,7 @@ function performAction(actionName, extraPayload = {}) {
     const fullAction = actionMap[actionName] || actionName.toUpperCase();
 
     const payload = { ...extraPayload };
-    if (fullAction === 'REQUEST_SIMILAR_ITEMS') {
+    if (['REQUEST_SIMILAR_ITEMS', 'REQUEST_PRODUCT_COMPARISON'].includes(fullAction)) {
         payload.product = currentProductData;
     }
     if (['REQUEST_CODE_EXPLAIN', 'REQUEST_DOCS'].includes(fullAction)) {

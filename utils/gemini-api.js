@@ -39,8 +39,10 @@ export async function generateGeminiReply(systemPrompt, userMessage, context) {
         }
     };
 
-    if (context.useGrounding) {
+    if (context.useGrounding && !model.includes("lite")) {
         payload.tools = [{ google_search: {} }];
+    } else if (context.useGrounding && model.includes("lite")) {
+        console.warn("Gemini API: Google Grounding (Search) is skipped because 'lite' models typically do not support tools.");
     }
 
     try {
@@ -55,8 +57,9 @@ export async function generateGeminiReply(systemPrompt, userMessage, context) {
         const data = await response.json();
 
         if (data.error) {
-            console.error("Gemini API Error:", data.error);
-            return { error: `Error: ${data.error.message}` };
+            console.error("Gemini API Error:", JSON.stringify(data.error, null, 2));
+            const errorMessage = data.error.message || JSON.stringify(data.error);
+            return { error: `Gemini API Error: ${errorMessage}` };
         }
 
         const replyText = data.candidates?.[0]?.content?.parts?.[0]?.text || "No response generated.";

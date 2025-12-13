@@ -87,7 +87,20 @@ async function handleAIRequest(msg) {
                 responseData = kpRes.reply || kpRes.error;
                 break;
             case "REQUEST_PRODUCT_COMPARISON": // Marketplace
-                responseData = "💰 Price Comparison:\n- Amazon: $29.99\n- eBay: $24.50 (Used)\n- Official Store: $35.00\n\nRecommendation: eBay offers best value if you don't mind open-box.";
+                console.log("Service Worker: Comparing Products...");
+                const productToCompare = msg.payload?.product || { title: "this item" };
+                const comparePrompt = `Find current prices for "${productToCompare.title}" at major online retailers (e.g. Amazon, eBay, Walmart).
+                
+                Provide a comparison table or list with:
+                - Retailer Name
+                - Price (if available)
+                - Condition (New/Used if specified)
+                - Link
+                
+                Conclude with a brief recommendation on the best value.`;
+
+                const compareRes = await generateGeminiReply("You are a smart shopping assistant. Use Google Search to find real prices.", comparePrompt, { url: msg.url, pageType: msg.pageType, useGrounding: true });
+                responseData = compareRes.reply || compareRes.error;
                 break;
             case "REQUEST_SIMILAR_ITEMS": // Marketplace - "Price Check & Compare"
                 // 1. SEARCH: Ask Gemini with Grounding
@@ -300,7 +313,20 @@ async function handleAIRequest(msg) {
                 responseData = docsRes.reply || docsRes.error;
                 break;
             case "REQUEST_SIMILAR_COURSES": // Online Course
-                responseData = "📚 Similar Courses:\n1. Python for Everybody (Coursera)\n2. Machine Learning by Andrew Ng (Coursera)\n3. Complete Python Bootcamp (Udemy)\n4. Intro to Computer Science (Udacity)\n\nRecommendation: 'Python for Everybody' is a great starting point.";
+                console.log("Service Worker: Finding Similar Courses...");
+                const courseUrl = msg.url;
+                const coursePrompt = `I am looking at this course: ${courseUrl}
+                
+                Suggest 3-5 similar or alternative courses from other platforms (Coursera, Udemy, edX, etc.).
+                For each, mention:
+                - Course Name
+                - Platform
+                - Key Differentiator
+                
+                Provide a direct link if possible.`;
+
+                const courseRes = await generateGeminiReply("You are an education advisor.", coursePrompt, { url: msg.url, pageType: msg.pageType, useGrounding: true });
+                responseData = courseRes.reply || courseRes.error;
                 break;
             default:
                 responseData = "Processed request: " + msg.action;
