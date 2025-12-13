@@ -73,10 +73,18 @@ async function handleAIRequest(msg) {
         console.log("Service Worker: Handling AI Request", msg.action);
         switch (msg.action) {
             case "REQUEST_SUMMARY": // Blog
-                responseData = "📌 Summary of this article:\n\nThis article discusses the importance of context-aware UI patterns. It highlights how Loom and others utilize sidebar interfaces to maintain user flow without blocking content. \n\nKey takeaways:\n- Sidebars > Modals for reference tasks\n- Context detection improves UX\n- Animation timing matters (300ms)";
+                console.log("Service Worker: Generating Summary...");
+                const summaryText = msg.payload?.text || "No text provided.";
+                const summaryPrompt = `Summarize this article text concisely. Focus on the main argument and conclusion.\n\nText:\n${summaryText.substring(0, 10000)}`;
+                const summaryRes = await generateGeminiReply("You are a helpful reading assistant.", summaryPrompt, { url: msg.url, pageType: msg.pageType });
+                responseData = summaryRes.reply || summaryRes.error;
                 break;
             case "REQUEST_KEYPOINTS":
-                responseData = "• Sidebar UI patterns are trending\n• Reactivity to page context is key\n• Non-blocking overlay strategies";
+                console.log("Service Worker: Generating Key Points...");
+                const kpText = msg.payload?.text || "No text provided.";
+                const kpPrompt = `Extract 3-5 key bullet points from this text.\n\nText:\n${kpText.substring(0, 10000)}`;
+                const kpRes = await generateGeminiReply("You are a helpful reading assistant.", kpPrompt, { url: msg.url, pageType: msg.pageType });
+                responseData = kpRes.reply || kpRes.error;
                 break;
             case "REQUEST_PRODUCT_COMPARISON": // Marketplace
                 responseData = "💰 Price Comparison:\n- Amazon: $29.99\n- eBay: $24.50 (Used)\n- Official Store: $35.00\n\nRecommendation: eBay offers best value if you don't mind open-box.";
@@ -181,39 +189,32 @@ async function handleAIRequest(msg) {
                 const explainRes = await generateGeminiReply("You are a senior developer.", explainPrompt, { url: msg.url, pageType: msg.pageType });
                 responseData = explainRes.reply || explainRes.error;
                 break;
-            case "REQUEST_CODE_EXPLAIN": // Dev - Explain Code
-                // ... (existing)
-                break; // implicit in existing code, but ensure I insert properly.
-
             case "SEND_CHAT":
                 console.log("Service Worker: Chat Message Received:", msg.message);
-                // 1. Intent Detection
-                detectChatIntent(msg.message, GEMINI_API_KEY) // Pass GEMINI_API_KEY
+                // 1. Intent Analysis
+                analyzeMessage(msg.message, GEMINI_API_KEY)
                     .then(async (intent) => {
-                        console.log("Service Worker: Chat Intent:", intent);
+                        console.log("Service Worker: Intent:", intent);
 
-                        if (intent.isTask) {
-                            // 2. Route to DOM Agent
+                        if (intent.type === "TASK") {
+                            // --- TASK EXECUTION ---
                             console.log("Service Worker: Routing to DOM Agent...");
                             try {
                                 let tabId = sender.tab?.id;
                                 if (!tabId) {
-                                    // Fallback: Query active tab
                                     const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
                                     tabId = tabs[0]?.id;
                                 }
 
                                 if (tabId) {
-                                    // Send to content script
+                                    const goal = intent.payload?.goal || msg.message;
                                     const agentRes = await chrome.tabs.sendMessage(tabId, {
                                         action: "EXECUTE_AGENT_TASK",
-                                        goal: intent.taskGoal || msg.message // Fallback to raw message
+                                        goal: goal
                                     });
 
-                                    // 3. Formulate Reply based on Agent Result
                                     let replyText = "";
                                     if (agentRes && agentRes.success) {
-                                        // Agent thinks it succeeded
                                         if (agentRes.result && agentRes.result.history && agentRes.result.history.length > 0) {
                                             replyText = "✅ **Task Complete**\n\nActions taken:\n" +
                                                 agentRes.result.history.map(h => `- ${h.action} on ${h.selector}`).join('\n');
@@ -231,22 +232,44 @@ async function handleAIRequest(msg) {
                                 console.error("Agent Execution Error:", e);
                                 sendResponse({ reply: "I tried to run the agent but encountered an error: " + e.message });
                             }
+
+                        } else if (intent.type === "DATA_SAVE") {
+                            // --- DATA SAVING ---
+                            const { key, value } = intent.payload || {};
+                            if (key && value) {
+                                try {
+                                    // Fetch existing
+                                    const data = await chrome.storage.sync.get("userProfileData");
+                                    const profile = data.userProfileData || {};
+
+                                    // Update
+                                    profile[key] = value;
+
+                                    // Save back
+                                    await chrome.storage.sync.set({ userProfileData: profile });
+                                    sendResponse({ reply: `✅ Saved **${key}** as "${value}".` });
+                                } catch (e) {
+                                    sendResponse({ reply: "❌ Failed to save data: " + e.message });
+                                }
+                            } else {
+                                sendResponse({ reply: "I understood you want to save data, but I couldn't extract the details. Please try 'My email is...'" });
+                            }
+
                         } else {
-                            // 3. Normal Chat (Fallback)
+                            // --- NORMAL CHAT ---
                             const chatSystemInstruction = "You are a helpful AI assistant in a browser sidebar. Concise answers.";
-                            // Assuming history is handled by the client or we pass simple context
                             const chatRes = await generateGeminiReply(chatSystemInstruction, msg.message, { ...msg.context }, sender.tab?.id);
                             sendResponse({ reply: chatRes.reply || chatRes.error });
                         }
                     })
                     .catch(err => {
                         console.error("Intent Detection Error:", err);
-                        // Fallback to normal chat
+                        // Fallback
                         generateGeminiReply("You are a helpful assistant.", msg.message, { ...msg.context }, sender.tab?.id)
                             .then(r => sendResponse({ reply: r.reply }))
                             .catch(e => sendResponse({ error: e.message }));
                     });
-                return true; // Async // Async response
+                return true; // Async
 
             case "REQUEST_AGENT_PLAN":
                 console.log("Service Worker: Agent Planning...");
@@ -292,7 +315,7 @@ async function handleAIRequest(msg) {
 
 async function handleChat(msg) {
     // Minimalistic system instruction
-    const systemPrompt = "You are a helpful browser assistant. Keep your responses extremely concise, minimal, and directly to the point. Do not be verbose.";
+    const systemPrompt = "You are a helpful browser assistant. If the user asks to fill a form or do a task, tell them 'I can do that! Just ask me to 'fill this form'.'. Do NOT suggest external tools like RoboForm. You ARE the automation tool.";
 
     const result = await generateGeminiReply(systemPrompt, msg.message, msg.context);
 
@@ -303,29 +326,35 @@ async function handleChat(msg) {
     return { reply: result.reply };
 }
 
-async function detectChatIntent(userMessage, apiKeyOverride = null) {
+async function analyzeMessage(userMessage, apiKeyOverride = null) {
     const prompt = `
     Analyze this user message: "${userMessage}"
-    Is the user asking to perform an action on the web page (like "fill form", "click button", "search for X")?
-    Or is it a general question/chat (like "explain this code", "summarize page", "hello")?
+    
+    Classify into one of 3 types:
+    1. "TASK": User wants to perform an action on the page (Fill form, click, search, scroll). BE TOLERANT OF TYPOS (e.g. "fil", "fill", "clic").
+    2. "DATA_SAVE": User is providing personal information to remember (e.g. "My email is...", "Set name to...").
+    3. "CHAT": General question or conversation.
+
+    If "DATA_SAVE", extract the key (normalized, proper case) and value.
+    If "TASK", refine the goal.
 
     Examples:
-    - "Fill this form" -> isTask: true
-    - "Search for red shoes" -> isTask: true
-    - "Click the sign up button" -> isTask: true
-    - "What is the page title?" -> isTask: false (question)
-    - "Summarize this article" -> isTask: false (summary)
+    - "Fill this form" -> { "type": "TASK", "payload": { "goal": "Fill this form" } }
+    - "fil this form" -> { "type": "TASK", "payload": { "goal": "Fill this form" } }
+    - "My email is bob@test.com" -> { "type": "DATA_SAVE", "payload": { "key": "Email", "value": "bob@test.com" } }
+    - "my name is manu" -> { "type": "DATA_SAVE", "payload": { "key": "Name", "value": "manu" } }
+    - "Hello" -> { "type": "CHAT" }
 
     Return JSON ONLY:
     {
-        "isTask": boolean,
-        "taskGoal": "Refined goal string if it is a task, else null"
+        "type": "TASK" | "DATA_SAVE" | "CHAT",
+        "payload": { ... }
     }
     `;
 
     // We reuse generateGeminiReply but simpler
     try {
-        const response = await generateGeminiReply("You are an intent classifier.", prompt, {}, null);
+        const response = await generateGeminiReply("You are an intent classifier. JSON only.", prompt, { skipContext: true }, null);
         let text = response.reply || "";
         if (text.includes('```json')) {
             text = text.replace(/```json/g, '').replace(/```/g, '');
@@ -333,7 +362,7 @@ async function detectChatIntent(userMessage, apiKeyOverride = null) {
         return JSON.parse(text);
     } catch (e) {
         console.warn("Intent detection failed, assuming chat.", e);
-        return { isTask: false };
+        return { type: "CHAT" };
     }
 }
 

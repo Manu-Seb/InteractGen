@@ -77,6 +77,14 @@ let detectedPageType = "generic";
                 sendResponse({ success: false, error: "DOM Agent not loaded." });
             }
         }
+
+        // 6. Text Extraction for Summarization
+        if (msg.action === "GET_PAGE_TEXT") {
+            // Simple innerText for now. Could be improved with Readability.js later.
+            const text = document.body.innerText.substring(0, 15000); // Limit size
+            sendResponse({ text: text || "No text found." });
+            return false; // Sync response
+        }
     });
 
     // 5. Code Block listeners (for Dev mode)

@@ -21,10 +21,17 @@ export async function generateGeminiReply(systemPrompt, userMessage, context) {
     }
     const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
+    let contentText = "";
+    if (context.skipContext) {
+        contentText = `${systemPrompt}\n\n${userMessage}`;
+    } else {
+        contentText = `${systemPrompt}\n\nContext: User is on a ${context.pageType || 'unknown'} page (${context.url || 'unknown'}).\n\nUser: ${userMessage}`;
+    }
+
     const payload = {
         contents: [{
             parts: [{
-                text: `${systemPrompt}\n\nContext: User is on a ${context.pageType} page (${context.url}).\n\nUser: ${userMessage}`
+                text: contentText
             }]
         }],
         generationConfig: {

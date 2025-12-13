@@ -172,28 +172,67 @@ function performAction(actionName, extraPayload = {}) {
     }
 
     console.log("Sidebar: Sending message", fullAction, payload);
-    chrome.runtime.sendMessage({
-        action: fullAction,
-        pageType: currentPageType,
-        url: currentUrl,
-        payload: payload
-    }, (response) => {
-        console.log("Sidebar: Received response", response);
 
-        if (chrome.runtime.lastError) {
-            console.error("Sidebar Error Message:", chrome.runtime.lastError.message);
-            console.error("Sidebar Error Object:", JSON.stringify(chrome.runtime.lastError));
-            if (resultBox) resultBox.innerText = "Error: " + chrome.runtime.lastError.message;
-            return;
-        }
+    const proceedWithRequest = (finalPayload) => {
+        chrome.runtime.sendMessage({
+            action: fullAction,
+            pageType: currentPageType,
+            url: currentUrl,
+            payload: finalPayload
+        }, (response) => {
+            console.log("Sidebar: Received response", response);
 
-        if (response && response.data) {
-            handleContentUpdate(response.data);
-        } else {
-            console.warn("Sidebar: Empty response received");
-            if (resultBox) resultBox.innerText = "Error: No response from AI service. Please check your connection or API key.";
-        }
-    });
+            if (chrome.runtime.lastError) {
+                console.error("Sidebar Error Message:", chrome.runtime.lastError.message);
+                if (resultBox) resultBox.innerText = "Error: " + chrome.runtime.lastError.message;
+                return;
+            }
+
+            if (response && response.data) {
+                handleContentUpdate(response.data);
+            } else {
+                console.warn("Sidebar: Empty response received");
+                if (resultBox) resultBox.innerText = "Error: No response from AI service.";
+            }
+        });
+    };
+
+    // If context is needed (Summmary/Keypoints), fetch logic
+    if (['REQUEST_SUMMARY', 'REQUEST_KEYPOINTS', 'REQUEST_TLDR'].includes(fullAction)) {
+        // We need to get text from the parent page. 
+        // We can't use chrome.tabs from sidebar, but we can query the ACTIVE tab via background relay,
+        // OR postMessage to parent content script. 
+        // We'll use tabs.sendMessage via background relay pattern which is cleaner for extension context.
+        // Wait... sidebar is an extension page, it CAN use chrome.tabs? 
+        // Yes, but only for querying. Not for content script injection unless permission.
+
+        // Easier path: Ask background to get text OR just assume background does it?
+        // Background doesn't have direct access to DOM text without executing script.
+
+        // Let's ask the active tab directly via tabs API if we can (Sidebar has tabs permission?)
+        // If not, we use the content script listener we just added.
+
+        chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+            if (tabs[0]) {
+                chrome.tabs.sendMessage(tabs[0].id, { action: "GET_PAGE_TEXT" }, (response) => {
+                    // Check if lastError exists (e.g. on restricted pages)
+                    if (chrome.runtime.lastError || !response) {
+                        console.warn("Failed to get page text", chrome.runtime.lastError);
+                        payload.text = "Error: Could not read page content. (Restricted page?)";
+                    } else {
+                        payload.text = response.text;
+                    }
+                    proceedWithRequest(payload);
+                });
+            } else {
+                payload.text = "Error: No active tab found.";
+                proceedWithRequest(payload);
+            }
+        });
+    } else {
+        proceedWithRequest(payload);
+    }
+
 }
 
 function handleContentUpdate(data) {
