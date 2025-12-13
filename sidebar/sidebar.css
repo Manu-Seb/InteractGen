@@ -440,3 +440,33 @@ input[type="text"]:focus {
 .chat-footer input {
   flex: 1;
 }
+
+/* Saved Pages */
+.saved-page-item {
+  display: flex !important;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px;
+  border-bottom: 1px solid #eee;
+}
+
+.saved-page-info {
+  flex: 1;
+  overflow: hidden;
+}
+
+.delete-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #ff4d4f;
+  font-size: 16px;
+  padding: 4px;
+  margin-left: 8px;
+  opacity: 0.7;
+  transition: opacity 0.2s;
+}
+
+.delete-btn:hover {
+  opacity: 1;
+}

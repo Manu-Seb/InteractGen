@@ -303,14 +303,59 @@ function loadSavedPages() {
         if (!ul) return;
 
         ul.innerHTML = "";
-        list.forEach(page => {
+
+        if (list.length === 0) {
+            ul.innerHTML = '<li style="padding:10px; color:#888; text-align:center;">No saved pages yet.</li>';
+            return;
+        }
+
+        list.forEach((page, index) => {
             const li = document.createElement('li');
-            li.className = "list-item";
-            li.style.padding = "8px";
-            li.style.borderBottom = "1px solid #eee";
-            li.innerHTML = `<a href="${page.url}" target="_blank" style="text-decoration:none; color:black; font-weight:500;">${new URL(page.url).hostname}</a><br><small>${new Date(page.timestamp).toLocaleDateString()}</small>`;
+            li.className = "saved-page-item";
+
+            // Info container
+            const infoDiv = document.createElement('div');
+            infoDiv.className = "saved-page-info";
+
+            const link = document.createElement('a');
+            link.href = page.url;
+            link.target = "_blank";
+            link.style.textDecoration = "none";
+            link.style.color = "black";
+            link.style.fontWeight = "500";
+            link.textContent = new URL(page.url).hostname;
+
+            const dateSpan = document.createElement('div');
+            dateSpan.style.fontSize = "12px";
+            dateSpan.style.color = "#666";
+            dateSpan.textContent = new Date(page.timestamp).toLocaleDateString();
+
+            infoDiv.appendChild(link);
+            infoDiv.appendChild(dateSpan);
+
+            // Delete button
+            const deleteBtn = document.createElement('button');
+            deleteBtn.className = "delete-btn";
+            deleteBtn.innerHTML = "🗑️";
+            deleteBtn.title = "Remove page";
+            deleteBtn.onclick = () => deleteSavedPage(index);
+
+            li.appendChild(infoDiv);
+            li.appendChild(deleteBtn);
             ul.appendChild(li);
         });
+    });
+}
+
+function deleteSavedPage(index) {
+    chrome.storage.local.get("savedPages", (data) => {
+        const list = data.savedPages || [];
+        if (index >= 0 && index < list.length) {
+            list.splice(index, 1);
+            chrome.storage.local.set({ savedPages: list }, () => {
+                loadSavedPages(); // Refresh list
+            });
+        }
     });
 }
 
